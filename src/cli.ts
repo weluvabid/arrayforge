@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { loadAdapters } from './benchmark/adapters.ts';
 import { benchmark } from './benchmark/measure.ts';
 import { printTable, toCsv } from './benchmark/report.ts';
-import { defaultIterations, workloadNames } from './benchmark/workloads.ts';
+import { workloadNames } from './benchmark/workloads.ts';
 import type { BenchmarkOptions, WorkloadName } from './benchmark/types.ts';
 
 interface CliArguments {
@@ -13,6 +13,7 @@ interface CliArguments {
   rounds: number;
   warmup: number;
   iterations: number | null;
+  targetSampleMs: number;
   seed: number;
   format: 'table' | 'json' | 'csv';
   output: string | null;
@@ -51,9 +52,10 @@ function parseArguments(args: readonly string[]): CliArguments {
     sizes: [100_000, 1_000_000],
     adapters: ['all'],
     workloads: [...workloadNames],
-    rounds: 7,
-    warmup: 2,
+    rounds: 11,
+    warmup: 3,
     iterations: null,
+    targetSampleMs: 25,
     seed: 42,
     format: 'table',
     output: null,
@@ -95,6 +97,10 @@ function parseArguments(args: readonly string[]): CliArguments {
         parsed.iterations = parseNumber(readValue(args, index, argument), argument, 1);
         index += 1;
         break;
+      case '--target-ms':
+        parsed.targetSampleMs = parseNumber(readValue(args, index, argument), argument, 1);
+        index += 1;
+        break;
       case '--seed':
         parsed.seed = parseNumber(readValue(args, index, argument), argument, 0);
         index += 1;
@@ -121,7 +127,8 @@ function parseArguments(args: readonly string[]): CliArguments {
       case '-h':
         printHelp();
         process.exit(0);
-      // falls through
+        break;
+
       default:
         throw new Error(`Unknown argument: ${argument ?? ''}`);
     }
@@ -147,9 +154,12 @@ function printHelp(): void {
   process.stdout.write('  --sizes 100000,1000000   Dataset sizes\n');
   process.stdout.write('  --adapter all            all installed adapters\n');
   process.stdout.write('  --workload all           workload or comma-separated workloads\n');
-  process.stdout.write('  --rounds 7               measured rounds\n');
-  process.stdout.write('  --warmup 2               warm-up rounds\n');
-  process.stdout.write('  --iterations N           operations per round\n');
+  process.stdout.write('  --rounds 11              measured rounds\n');
+  process.stdout.write('  --warmup 3               warm-up rounds\n');
+  process.stdout.write(
+    '  --iterations N           fixed operations per round (disables calibration)\n',
+  );
+  process.stdout.write('  --target-ms 25            target duration per measured round\n');
   process.stdout.write('  --seed 42                deterministic workload seed\n');
   process.stdout.write('  --format table            table, json or csv\n');
   process.stdout.write('  --output report.json      write results to a file\n');
@@ -194,16 +204,17 @@ async function main(): Promise<void> {
       rounds: args.rounds,
       warmup: args.warmup,
       seed: args.seed,
+      targetSampleMs: args.targetSampleMs,
     };
 
     for (const adapter of adapters) {
       for (const workload of args.workloads) {
-        const iterations = args.iterations ?? defaultIterations(workload, size);
+        const iterations = args.iterations;
         process.stderr.write(
           `Running ${adapter.name} / ${workload} / ${size.toLocaleString('en-US')} ` +
-            `(${iterations} ops)\n`,
+            `(${iterations === null ? `calibrated to ${args.targetSampleMs}ms` : `${iterations} ops`})\n`,
         );
-        results.push(benchmark(adapter, workload, options, iterations));
+        results.push(benchmark(adapter, workload, options, iterations ?? undefined));
       }
     }
   }

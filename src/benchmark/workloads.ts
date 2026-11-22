@@ -17,6 +17,8 @@ export function defaultIterations(workload: WorkloadName, size: number): number 
       return Math.max(1, Math.floor(10 * scale));
     case 'sequential-iteration':
       return 1;
+    case 'mixed-operations':
+      return size <= 100_000 ? 256 : size <= 1_000_000 ? 128 : 32;
     case 'range-delete':
       return Math.max(1, Math.floor(3 * scale));
     case 'batch-update':
@@ -129,6 +131,32 @@ export function runWorkload(
 
       break;
     }
+
+    case 'mixed-operations': {
+      for (let iteration = 0; iteration < iterations; iteration += 1) {
+        const length = adapter.length(collection);
+        const choice = random();
+
+        if (choice < 0.7 && length > 0) {
+          const index = Math.floor(random() * length);
+          checksum += adapter.get(collection, index) ?? 0;
+        } else if (choice < 0.9 && length > 0) {
+          const index = Math.floor(random() * length);
+          collection = adapter.set(collection, index, options.size + iteration);
+          checksum += options.size + iteration;
+        } else if (choice < 0.95) {
+          const index = Math.floor(random() * (length + 1));
+          collection = adapter.insert(collection, index, options.size + iteration);
+          checksum += adapter.length(collection);
+        } else if (length > 0) {
+          const index = Math.floor(random() * length);
+          collection = adapter.delete(collection, index);
+          checksum += adapter.length(collection);
+        }
+      }
+
+      break;
+    }
   }
 
   return { collection, checksum, retained };
@@ -143,4 +171,5 @@ export const workloadNames: readonly WorkloadName[] = [
   'range-delete',
   'snapshot',
   'sequential-iteration',
+  'mixed-operations',
 ];

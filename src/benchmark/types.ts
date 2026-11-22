@@ -26,13 +26,15 @@ export type WorkloadName =
   | 'batch-update'
   | 'range-delete'
   | 'snapshot'
-  | 'sequential-iteration';
+  | 'sequential-iteration'
+  | 'mixed-operations';
 
 export interface BenchmarkOptions {
   readonly size: number;
   readonly rounds: number;
   readonly warmup: number;
   readonly seed: number;
+  readonly targetSampleMs?: number;
 }
 
 export interface BenchmarkResult {
@@ -41,6 +43,9 @@ export interface BenchmarkResult {
   readonly size: number;
   readonly rounds: number;
   readonly iterations: number;
+  readonly targetSampleMs: number;
+  readonly sampleDurationMs: number;
+  readonly explicitGc: boolean;
   readonly latencyMs: {
     readonly p50: number;
     readonly p95: number;

@@ -19,22 +19,24 @@ A collection version points to an immutable root. An update creates new pages an
 
 The public collection interfaces stay independent of the tree and page implementations.
 
-## Tree evaluation
+## Tree selection
 
-ArrayForge will benchmark two persistent sequence structures:
+ArrayForge evaluates two persistent sequence structures:
 
-- **B+ tree:** compact internal nodes, subtree sizes and contiguous leaf pages.
-- **RRB tree:** relaxed radix-balanced nodes with efficient persistent sequence operations.
+- **B+ tree:** balanced leaf and branch occupancy with subtree-size metadata.
+- **RRB-style tree:** relaxed occupancy with subtree-size metadata and path copying.
 
-Both candidates will use the same workload definitions and comparable page capacities. The evaluation covers indexed reads, updates, insertions, deletions, range operations, concatenation, splitting, transactions and sequential iteration.
+Both candidates remain under evaluation. `Vector` currently defaults to the RRB-style implementation, but this is an implementation default rather than a final architecture selection.
 
-The selection will consider latency, allocation, retained memory, iteration locality and implementation complexity.
+The initial comparison covered indexed reads, updates, insertions, deletions, range deletion, batch updates and sequential iteration at 100K, 1M and 5M elements. The next comparison adds calibrated samples, mixed operations, optimized iteration and improved memory-retention measurements.
 
 ## Page capacity
 
-Reference pages will use bounded capacity classes. Initial candidates are 256, 512 and 1024 elements.
+Reference pages use bounded capacities of 256, 512 and 1024 elements.
 
-The benchmark work will determine how page capacity should adapt to collection size and mutation patterns. Splits, merges and capacity changes must preserve existing snapshots.
+The balanced profile selects 256-element pages up to 100K elements and 512-element pages above that size. The mutation-heavy profile selects 256-element pages. The read-heavy profile selects 512-element pages below 1M elements and 1024-element pages from 1M upward.
+
+The selected capacity remains stable for the lifetime of a vector. Splits and rebalancing preserve earlier snapshots.
 
 ## Storage backends
 
@@ -101,7 +103,7 @@ Logical deletion through tombstones is a separate operation from ordered deletio
 | Sequential iteration | O(N)                                      |
 | Batch mutation       | Reuse each touched page and modified path |
 
-The benchmark suite will cover 100K, 1M, 5M, 10M and 50M elements. Results include latency percentiles, throughput, heap, external memory, ArrayBuffer memory, RSS and checksums.
+The benchmark suite covers 100K, 1M, 5M, 10M and 50M elements. Results include latency percentiles, throughput, heap, external memory, ArrayBuffer memory, RSS and checksums. The Phase 2 tree evaluation is recorded in `docs/benchmarks/phase-2-tree-evaluation.md`.
 
 ## Runtime
 

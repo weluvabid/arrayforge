@@ -1,6 +1,6 @@
 import type { BenchmarkResult } from './types.ts';
 
-function escapeCsv(value: string | number | null): string {
+function escapeCsv(value: string | number | boolean | null): string {
   const text = value === null ? '' : String(value);
 
   if (text.includes(',') || text.includes('"') || text.includes('\n')) {
@@ -17,6 +17,9 @@ export function toCsv(results: readonly BenchmarkResult[]): string {
     'size',
     'rounds',
     'iterations',
+    'target_sample_ms',
+    'sample_duration_ms',
+    'explicit_gc',
     'latency_p50_ms',
     'latency_p95_ms',
     'latency_p99_ms',
@@ -34,6 +37,9 @@ export function toCsv(results: readonly BenchmarkResult[]): string {
       result.size,
       result.rounds,
       result.iterations,
+      result.targetSampleMs,
+      result.sampleDurationMs,
+      result.explicitGc,
       result.latencyMs.p50,
       result.latencyMs.p95,
       result.latencyMs.p99,
@@ -56,9 +62,12 @@ export function printTable(results: readonly BenchmarkResult[]): string {
     adapter: result.adapter,
     workload: result.workload,
     size: result.size.toLocaleString('en-US'),
-    'p50 ms': result.latencyMs.p50.toFixed(3),
-    'p95 ms': result.latencyMs.p95.toFixed(3),
-    'p99 ms': result.latencyMs.p99.toFixed(3),
+    iterations: result.iterations.toLocaleString('en-US'),
+    'sample ms': result.sampleDurationMs.toFixed(1),
+    'explicit gc': result.explicitGc ? 'yes' : 'no',
+    'p50 ms': result.latencyMs.p50.toFixed(4),
+    'p95 ms': result.latencyMs.p95.toFixed(4),
+    'p99 ms': result.latencyMs.p99.toFixed(4),
     'ops/sec': Math.round(result.operationsPerSecond).toLocaleString('en-US'),
     'heap Δ MB':
       result.memoryDeltaBytes.heapUsed === null

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { nativeCopyAdapter } from '../src/adapters/native.ts';
+import { nativeCopyAdapter, nativeMutableAdapter } from '../src/adapters/native.ts';
 import { benchmark } from '../src/benchmark/measure.ts';
+import { printTable, toCsv } from '../src/benchmark/report.ts';
 import { createRandom } from '../src/benchmark/random.ts';
 import { runWorkload, workloadNames } from '../src/benchmark/workloads.ts';
 import type { BenchmarkOptions } from '../src/benchmark/types.ts';
@@ -21,6 +22,9 @@ await test('benchmark runner returns stable result metadata', () => {
   assert.equal(result.size, 1_000);
   assert.equal(result.rounds, 3);
   assert.equal(result.iterations, 5);
+  assert.equal(result.targetSampleMs, 25);
+  assert.ok(result.sampleDurationMs >= 0);
+  assert.equal(typeof result.explicitGc, 'boolean');
   assert.ok(result.latencyMs.p50 >= 0);
   assert.ok(result.operationsPerSecond > 0);
   assert.ok('heapUsed' in result.memoryDeltaBytes);
@@ -47,6 +51,7 @@ await test('workload registry contains the supported operations', () => {
     'range-delete',
     'snapshot',
     'sequential-iteration',
+    'mixed-operations',
   ]);
 });
 
@@ -60,4 +65,44 @@ await test('every workload returns a collection with a consistent length', () =>
     assert.ok(nativeCopyAdapter.length(result.collection) >= 0);
     assert.ok(Number.isFinite(result.checksum));
   }
+});
+
+await test('benchmark calibrates short workloads to the target sample duration', () => {
+  const result = benchmark(nativeCopyAdapter, 'point-read', { ...options, targetSampleMs: 5 });
+
+  assert.ok(result.iterations >= 1_000);
+  assert.ok(result.sampleDurationMs > 0);
+});
+
+await test('benchmark reports include calibration and memory collection metadata', () => {
+  const result = benchmark(nativeCopyAdapter, 'point-read', options, 5);
+  const table = printTable([result]);
+  const csv = toCsv([result]);
+
+  assert.match(table, /iterations/);
+  assert.match(table, /explicit gc/);
+  assert.match(csv, /target_sample_ms/);
+  assert.match(csv, /explicit_gc/);
+});
+
+await test('mixed workload produces the same deterministic result across native adapters', () => {
+  const values = Array.from({ length: options.size }, (_, index) => index);
+  const copyResult = runWorkload(
+    nativeCopyAdapter,
+    'mixed-operations',
+    nativeCopyAdapter.create(values),
+    options,
+    500,
+  );
+
+  const mutableResult = runWorkload(
+    nativeMutableAdapter,
+    'mixed-operations',
+    nativeMutableAdapter.create(values),
+    options,
+    500,
+  );
+
+  assert.deepEqual(copyResult.collection, mutableResult.collection);
+  assert.equal(copyResult.checksum, mutableResult.checksum);
 });

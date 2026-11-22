@@ -17,6 +17,7 @@ interface RuntimeMemory {
 
 interface Sample {
   readonly latencyMs: number;
+  readonly durationMs: number;
   readonly operationsPerSecond: number;
   readonly memoryDeltaBytes: {
     readonly heapUsed: number | null;
@@ -52,6 +53,12 @@ function collectMemory(): RuntimeMemory | null {
   };
 }
 
+function hasExplicitGarbageCollection(): boolean {
+  const runtime = globalThis as typeof globalThis & { gc?: () => void };
+
+  return typeof runtime.gc === 'function';
+}
+
 function collectGarbage(): void {
   const runtime = globalThis as typeof globalThis & { gc?: () => void };
 
@@ -68,16 +75,18 @@ function runSample(
   collectGarbage();
 
   const memoryBefore = collectMemory();
-  const collection = adapter.create(values);
+  let collection: unknown = adapter.create(values);
   const startedAt = performance.now();
   const run = runWorkload(adapter, workload, collection, options, iterations);
   const elapsedMs = Math.max(performance.now() - startedAt, 0.000_001);
+  collection = undefined;
   collectGarbage();
 
   const memoryAfter = collectMemory();
 
   return {
     latencyMs: elapsedMs / iterations,
+    durationMs: elapsedMs,
     operationsPerSecond: (iterations / elapsedMs) * 1_000,
     memoryDeltaBytes: {
       heapUsed:
@@ -99,18 +108,85 @@ function runSample(
   };
 }
 
+const DEFAULT_TARGET_SAMPLE_MS = 25;
+
+function maximumIterations(workload: WorkloadName, size: number): number {
+  switch (workload) {
+    case 'point-read':
+      return 100_000;
+    case 'point-update':
+    case 'batch-update':
+    case 'mixed-operations':
+      return 10_000;
+    case 'point-insert':
+      return 1_000;
+    case 'point-delete':
+      return Math.max(1, Math.min(1_000, Math.floor(size / 10)));
+    case 'range-delete':
+      return 32;
+    case 'snapshot':
+      return 1_000;
+    case 'sequential-iteration':
+      return 1_000;
+  }
+}
+
+function calibrateIterations(
+  adapter: CollectionAdapter,
+  workload: WorkloadName,
+  values: number[],
+  options: BenchmarkOptions,
+  initialIterations: number,
+  targetSampleMs: number,
+): number {
+  const measureProbe = (iterations: number): number => {
+    const collection = adapter.create(values);
+    const startedAt = performance.now();
+    runWorkload(adapter, workload, collection, options, iterations);
+
+    return Math.max(performance.now() - startedAt, 0.001);
+  };
+  const probeDurations = [
+    measureProbe(initialIterations),
+    measureProbe(initialIterations),
+    measureProbe(initialIterations),
+  ];
+  const elapsedMs = percentile(probeDurations, 50);
+  const maximum = maximumIterations(workload, options.size);
+  const estimated = Math.min(
+    maximum,
+    Math.max(initialIterations, Math.ceil((initialIterations * targetSampleMs) / elapsedMs)),
+  );
+
+  if (estimated === initialIterations || estimated === maximum) {
+    return estimated;
+  }
+
+  const calibratedDuration = measureProbe(estimated);
+
+  return Math.min(
+    maximum,
+    Math.max(initialIterations, Math.ceil((estimated * targetSampleMs) / calibratedDuration)),
+  );
+}
+
 export function benchmark(
   adapter: CollectionAdapter,
   workload: WorkloadName,
   options: BenchmarkOptions,
-  iterations = defaultIterations(workload, options.size),
+  requestedIterations?: number,
 ): BenchmarkResult {
   const values = createValues(options.size);
+  const targetSampleMs = Math.max(1, options.targetSampleMs ?? DEFAULT_TARGET_SAMPLE_MS);
+  const initialIterations = requestedIterations ?? defaultIterations(workload, options.size);
 
   for (let warmup = 0; warmup < options.warmup; warmup += 1) {
-    runSample(adapter, workload, values, options, iterations);
+    runSample(adapter, workload, values, options, initialIterations);
   }
 
+  const iterations =
+    requestedIterations ??
+    calibrateIterations(adapter, workload, values, options, initialIterations, targetSampleMs);
   const samples: Sample[] = [];
 
   for (let round = 0; round < options.rounds; round += 1) {
@@ -119,6 +195,7 @@ export function benchmark(
 
   const latencies = samples.map((sample) => sample.latencyMs);
   const throughputs = samples.map((sample) => sample.operationsPerSecond);
+  const durations = samples.map((sample) => sample.durationMs);
   const averageMemoryDelta = (key: keyof Sample['memoryDeltaBytes']): number | null => {
     const values = samples
       .map((sample) => sample.memoryDeltaBytes[key])
@@ -136,6 +213,9 @@ export function benchmark(
     size: options.size,
     rounds: options.rounds,
     iterations,
+    targetSampleMs,
+    sampleDurationMs: percentile(durations, 50),
+    explicitGc: hasExplicitGarbageCollection(),
     latencyMs: {
       p50: percentile(latencies, 50),
       p95: percentile(latencies, 95),

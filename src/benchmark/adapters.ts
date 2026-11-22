@@ -1,4 +1,5 @@
 import { nativeCopyAdapter, nativeMutableAdapter } from '../adapters/native.ts';
+import { persistentTreeAdapters } from '../adapters/persistent-tree.ts';
 import { loadImmerAdapter } from '../adapters/immer.ts';
 import { loadImmutableAdapter } from '../adapters/immutable.ts';
 import { loadMutativeAdapter } from '../adapters/mutative.ts';
@@ -19,6 +20,7 @@ export async function loadAdapters(
     nativeCopyAdapter.name,
     nativeMutableAdapter.name,
     ...optionalAdapters.map(([name]) => name),
+    ...persistentTreeAdapters.map((adapter) => adapter.name),
   ]);
   const unknownNames = requested.filter((name) => !knownNames.has(name));
 
@@ -35,6 +37,12 @@ export async function loadAdapters(
 
   if (includeAll || selected.has(nativeMutableAdapter.name)) {
     results.push({ adapter: nativeMutableAdapter });
+  }
+
+  for (const adapter of persistentTreeAdapters) {
+    if (includeAll || selected.has(adapter.name)) {
+      results.push({ adapter });
+    }
   }
 
   for (const [name, load] of optionalAdapters) {

@@ -23,7 +23,9 @@
     "bench": "node --experimental-strip-types src/cli.ts",
     "bench:smoke": "node --experimental-strip-types src/cli.ts --size 10000 --rounds 3 --warmup 1 --iterations 10",
     "bench:browser": "vite --config benchmarks/browser/vite.config.ts --host 127.0.0.1",
-    "bench:browser:build": "vite build --config benchmarks/browser/vite.config.ts"
+    "bench:browser:build": "vite build --config benchmarks/browser/vite.config.ts",
+    "bench:trees": "node --experimental-strip-types src/cli.ts --sizes 100000,1000000 --adapter bplus-256,rrb-256,bplus-512,rrb-512,bplus-1024,rrb-1024 --rounds 11 --warmup 3 --target-ms 25",
+    "bench:trees:large": "node --experimental-strip-types src/cli.ts --sizes 5000000 --adapter bplus-256,rrb-256,bplus-512,rrb-512,bplus-1024,rrb-1024 --rounds 11 --warmup 3 --target-ms 25"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

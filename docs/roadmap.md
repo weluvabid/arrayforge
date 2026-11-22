@@ -19,12 +19,15 @@
 
 ## Phase 2 — Tree evaluation and persistent reference engine
 
-- Implement comparable B+ tree and RRB tree candidates.
-- Measure both structures across the benchmark workloads.
-- Evaluate reference page capacities and select the primary tree.
-- Implement the selected tree and reference pages.
-- Add root snapshots, structural sharing and indexed reads.
-- Verify point updates and deletion against native arrays.
+**Status: Complete**
+
+- Implement persistent B+ tree and RRB-style tree candidates.
+- Add reference pages with 256, 512 and 1024 element capacities.
+- Benchmark reads, updates, insertions, deletions, range deletion, batch updates and iteration.
+- Select the RRB-style tree as the primary vector implementation.
+- Add adaptive page capacity profiles.
+- Add immutable roots, structural sharing and indexed reads.
+- Verify randomized edits against native arrays.
 
 ## Phase 3 — Transaction engine
 

@@ -22,28 +22,31 @@ The benchmark lab provides a consistent set of workloads for comparing collectio
 | `range-delete`         | Delete a contiguous range                           |
 | `snapshot`             | Retain multiple snapshots of one collection         |
 | `sequential-iteration` | Traverse the collection                             |
+| `mixed-operations`     | 70% reads, 20% updates, 5% inserts, 5% deletes      |
 
 The random workload uses a seeded generator. The same seed produces the same index sequence across adapters.
 
 ## Measurements
 
-Each result includes p50, p95 and p99 per-operation latency, median operations per second, changes in heap, external, ArrayBuffer and resident memory, and a checksum. JSON reports also include the Node.js version and platform.
+Each result includes p50, p95 and p99 per-operation latency, median operations per second, the measured sample duration, memory deltas and a checksum. JSON reports also include the Node.js version and platform.
 
-Memory changes are sampled before and after each round. Heap, external and ArrayBuffer measurements help track JavaScript objects and typed-array storage; RSS shows the process-level change. Run Node with `--expose-gc` when you want the harness to request garbage collection before and after each measured round:
+By default, the harness calibrates operation counts to a 25 ms measured sample. This gives short operations enough repetitions to produce useful timings while keeping expensive operations bounded. Workloads that consume collection contents or retain snapshots have workload-specific iteration limits. Use `--iterations` to set a fixed operation count, or `--target-ms` to change the target duration.
+
+Memory changes are sampled before and after each round. With explicit GC enabled, heap, external and ArrayBuffer measurements describe the post-round retained-memory delta; they are not total allocation counts. Without explicit GC, the deltas also reflect garbage-collection timing. RSS shows the process-level change. Run Node with `--expose-gc` when you want the harness to request garbage collection before and after each measured round. The report records whether explicit GC was available:
 
 ```sh
 node --expose-gc --experimental-strip-types src/cli.ts --sizes 100000,1000000
 ```
 
-Use the same runtime, hardware, dataset, warm-up, rounds and iteration counts for comparisons. Close other CPU-heavy applications and repeat runs when results are close.
+Use the same runtime, hardware, dataset, warm-up, rounds and target duration for comparisons. Close other CPU-heavy applications and repeat runs when results are close. Percentiles are calculated across measured rounds, so increase `--rounds` when tail-latency estimates matter.
 
 ## Browser runs
 
-The browser page compares native arrays, Immer, Mutative and Immutable.js using the same workload definitions. Heap values are shown when the browser exposes `performance.memory`. Browser results include the user agent and hardware concurrency in the exported JSON.
+The browser page compares native arrays, Immer, Mutative and Immutable.js using the same workload definitions. Browser runs use the workload's fixed default iteration count rather than the Node runner's duration calibration. Heap values are shown when the browser exposes `performance.memory`. Browser results include the user agent and hardware concurrency in the exported JSON.
 
 ## Example commands
 
 ```sh
-pnpm bench -- --size 1000000 --workload point-update --rounds 7
+pnpm bench -- --size 1000000 --workload point-update --rounds 21 --target-ms 50
 pnpm bench -- --sizes 100000,1000000 --adapter native-copy,immer,mutative,immutable-js --format json --output reports/collections.json
 ```

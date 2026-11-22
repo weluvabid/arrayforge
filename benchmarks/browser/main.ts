@@ -1,4 +1,5 @@
 import { nativeCopyAdapter, nativeMutableAdapter } from '../../src/adapters/native.ts';
+import { persistentTreeAdapters } from '../../src/adapters/persistent-tree.ts';
 import {
   immerBrowserAdapter,
   immutableBrowserAdapter,
@@ -93,6 +94,9 @@ function runAdapter(
     size: options.size,
     rounds: options.rounds,
     iterations,
+    targetSampleMs: options.targetSampleMs ?? 0,
+    sampleDurationMs: p50 * iterations,
+    explicitGc: false,
     latencyMs: { p50, p95, p99 },
     operationsPerSecond: 1_000 / p50,
     memoryDeltaBytes: {
@@ -171,6 +175,7 @@ async function runBenchmarks(): Promise<void> {
     immerBrowserAdapter,
     mutativeBrowserAdapter,
     immutableBrowserAdapter,
+    ...persistentTreeAdapters,
   ];
 
   button.disabled = true;

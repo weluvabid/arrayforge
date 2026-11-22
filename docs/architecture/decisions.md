@@ -43,3 +43,15 @@ These decisions define the starting point for ArrayForge implementation.
 **Decision:** Never mutate a page or tree node reachable from a committed root.
 
 **Reason:** This invariant makes snapshots safe to share and gives transactions a clear copy-on-write boundary.
+
+## ADR-008: Keep both tree candidates under evaluation
+
+**Decision:** Retain both persistent B+ tree and RRB-style candidates. `Vector` currently defaults to the RRB-style implementation while the primary structure remains unselected.
+
+**Reason:** The measured workloads do not identify a consistent winner. RRB has an advantage in range deletion, while B+ is competitive or faster in point operations, batch updates and snapshots. Mixed workloads, optimized iteration and controlled memory measurements are part of the remaining evaluation.
+
+## ADR-009: Select reference page capacity from workload profile
+
+**Decision:** Support 256, 512 and 1024 element pages. The balanced profile selects 256 elements up to 100K items and 512 above that size. Mutation-heavy workloads use 256-element pages. Read-heavy workloads use 1024-element pages from one million items upward.
+
+**Reason:** The benchmark runs showed different page sizes working well for mutation batches and sequential iteration. The profile makes that trade-off explicit at construction time.
