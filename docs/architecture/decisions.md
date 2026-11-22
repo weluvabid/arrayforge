@@ -55,3 +55,7 @@ These decisions define the starting point for ArrayForge implementation.
 **Decision:** Support 256, 512 and 1024 element pages. The balanced profile selects 256 elements up to 100K items and 512 above that size. Mutation-heavy workloads use 256-element pages. Read-heavy workloads use 1024-element pages from one million items upward.
 
 **Reason:** The benchmark runs showed different page sizes working well for mutation batches and sequential iteration. The profile makes that trade-off explicit at construction time.
+
+## Tree candidate implementation status
+
+The exported B+ and RRB-style vectors currently share `PersistentTreeVector` and its node representation. Their only algorithmic distinction is deletion rebalancing. The existing benchmark data is useful for comparing those policies, but does not yet establish a winner between two distinct tree structures. Separate implementations are required before ADR-008 can be closed.

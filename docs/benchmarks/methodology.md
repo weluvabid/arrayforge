@@ -50,3 +50,16 @@ The browser page compares native arrays, Immer, Mutative and Immutable.js using 
 pnpm bench -- --size 1000000 --workload point-update --rounds 21 --target-ms 50
 pnpm bench -- --sizes 100000,1000000 --adapter native-copy,immer,mutative,immutable-js --format json --output reports/collections.json
 ```
+
+## Tree allocation and retained-memory profiling
+
+Use the dedicated V8 sampling profiler to compare the 256-element B+ and RRB candidates:
+
+```sh
+pnpm profile:trees
+pnpm profile:trees:large
+```
+
+The profiler runs with `--expose-gc`, samples V8 allocations during a deterministic point-update sequence, reports the largest sampled allocation sites, and times a full traversal. It then retains a sequence of persistent versions, forces collection, records the retained heap, releases those versions, and measures again while keeping the base vector alive.
+
+`sampledAllocations` is V8's statistical allocation sample, not an exact count of every allocation. `retainedDelta` measures the extra live memory held by the retained versions after collection. `releasedDelta` shows the remaining change after the snapshots are released. Compare candidates in the same Node version and process conditions; use multiple runs when the differences are small.

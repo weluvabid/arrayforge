@@ -83,6 +83,7 @@ await test('benchmark reports include calibration and memory collection metadata
   assert.match(table, /explicit gc/);
   assert.match(csv, /target_sample_ms/);
   assert.match(csv, /explicit_gc/);
+  assert.match(csv, /,(?:true|false),/);
 });
 
 await test('mixed workload produces the same deterministic result across native adapters', () => {

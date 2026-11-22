@@ -66,3 +66,9 @@ For a tree with branching factor B and page capacity P:
 | Iteration    | O(N)                                                   |
 
 Page cloning copies at most one reference page along the modified path for a point update. Unchanged pages and branches are shared between versions.
+
+## Implementation status
+
+The current code routes both exported candidates through one `PersistentTreeVector` implementation. They share the node representation, subtree-size indexing, page construction, point-update path and iterator. The `kind` option changes deletion rebalancing: B+ mode rebalances underfull siblings, while RRB-style mode permits relaxed occupancy.
+
+The current benchmark therefore compares deletion policies over a shared tree engine, rather than two independently implemented tree structures. Point-update and iteration measurements describe that shared implementation. A structural comparison requires separate node invariants and algorithms before the primary tree can be selected.
