@@ -173,3 +173,10 @@ select {
 [hidden] {
   display: none !important;
 }
+
+@media (hover: none), (pointer: coarse) {
+  .tooltip::before,
+  .tooltip::after {
+    display: none !important;
+  }
+}
