@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks';
 import { createValues } from './random.ts';
-import { defaultIterations, runWorkload } from './workloads.ts';
+import { defaultIterations, prepareWorkload, runWorkload } from './workloads.ts';
 import type {
   BenchmarkOptions,
   BenchmarkResult,
@@ -26,6 +26,7 @@ interface Sample {
     readonly rss: number | null;
   };
   readonly checksum: number;
+  readonly structure: BenchmarkResult['structure'];
 }
 
 function percentile(values: readonly number[], percentileValue: number): number {
@@ -72,13 +73,33 @@ function runSample(
   options: BenchmarkOptions,
   iterations: number,
 ): Sample {
+  const prepared = prepareWorkload(workload, options);
   collectGarbage();
 
   const memoryBefore = collectMemory();
-  let collection: unknown = adapter.create(values);
-  const startedAt = performance.now();
-  const run = runWorkload(adapter, workload, collection, options, iterations);
-  const elapsedMs = Math.max(performance.now() - startedAt, 0.000_001);
+  let collection: unknown;
+  let run: ReturnType<typeof runWorkload>;
+  let elapsedMs: number;
+
+  if (workload === 'construction') {
+    const startedAt = performance.now();
+
+    for (let iteration = 0; iteration < iterations; iteration += 1) {
+      collection = adapter.create(values);
+    }
+
+    elapsedMs = Math.max(performance.now() - startedAt, 0.000_001);
+    run = runWorkload(adapter, workload, collection, options, iterations, prepared);
+  } else {
+    collection = adapter.create(values);
+    const startedAt = performance.now();
+    run = runWorkload(adapter, workload, collection, options, iterations, prepared);
+    elapsedMs = Math.max(performance.now() - startedAt, 0.000_001);
+  }
+
+  const checksum =
+    workload === 'construction' ? run.checksum : run.checksum + adapter.length(run.collection);
+  const structure = adapter.inspect?.(run.collection) ?? null;
   collection = undefined;
   collectGarbage();
 
@@ -104,14 +125,17 @@ function runSample(
       rss:
         memoryBefore === null || memoryAfter === null ? null : memoryAfter.rss - memoryBefore.rss,
     },
-    checksum: run.checksum + adapter.length(run.collection),
+    checksum,
+    structure,
   };
 }
 
 const DEFAULT_TARGET_SAMPLE_MS = 25;
 
-function maximumIterations(workload: WorkloadName): number {
+export function maximumIterations(workload: WorkloadName, size: number): number {
   switch (workload) {
+    case 'construction':
+      return 20;
     case 'point-read':
       return 100_000;
     case 'point-update':
@@ -119,14 +143,21 @@ function maximumIterations(workload: WorkloadName): number {
     case 'mixed-operations':
       return 10_000;
     case 'point-insert':
-      return 1_000;
-    case 'point-delete':
+      return 10_000;
+    case 'mutation-churn':
       return 50_000;
-    case 'range-delete':
-      return 5_000;
+    case 'point-delete':
+      return Math.min(10_000, size);
+    case 'range-delete': {
+      const start = Math.floor(size / 4);
+      const deleteCount = Math.max(1, Math.floor(size / 100));
+
+      return Math.max(1, Math.ceil((size - start) / deleteCount));
+    }
     case 'snapshot':
       return 1_000;
     case 'sequential-iteration':
+    case 'sequential-visit':
       return 1_000;
   }
 }
@@ -140,9 +171,21 @@ function calibrateIterations(
   targetSampleMs: number,
 ): number {
   const measureProbe = (iterations: number): number => {
+    const prepared = prepareWorkload(workload, options);
+
+    if (workload === 'construction') {
+      const startedAt = performance.now();
+
+      for (let iteration = 0; iteration < iterations; iteration += 1) {
+        adapter.create(values);
+      }
+
+      return Math.max(performance.now() - startedAt, 0.001);
+    }
+
     const collection = adapter.create(values);
     const startedAt = performance.now();
-    runWorkload(adapter, workload, collection, options, iterations);
+    runWorkload(adapter, workload, collection, options, iterations, prepared);
 
     return Math.max(performance.now() - startedAt, 0.001);
   };
@@ -152,7 +195,7 @@ function calibrateIterations(
     measureProbe(initialIterations),
   ];
   const elapsedMs = percentile(probeDurations, 50);
-  const maximum = maximumIterations(workload);
+  const maximum = maximumIterations(workload, options.size);
   const estimated = Math.min(
     maximum,
     Math.max(initialIterations, Math.ceil((initialIterations * targetSampleMs) / elapsedMs)),
@@ -178,15 +221,19 @@ export function benchmark(
 ): BenchmarkResult {
   const values = createValues(options.size);
   const targetSampleMs = Math.max(1, options.targetSampleMs ?? DEFAULT_TARGET_SAMPLE_MS);
-  const initialIterations = requestedIterations ?? defaultIterations(workload, options.size);
+  const initialIterations = Math.min(
+    requestedIterations ?? defaultIterations(workload, options.size),
+    maximumIterations(workload, options.size),
+  );
 
   for (let warmup = 0; warmup < options.warmup; warmup += 1) {
     runSample(adapter, workload, values, options, initialIterations);
   }
 
   const iterations =
-    requestedIterations ??
-    calibrateIterations(adapter, workload, values, options, initialIterations, targetSampleMs);
+    requestedIterations === undefined
+      ? calibrateIterations(adapter, workload, values, options, initialIterations, targetSampleMs)
+      : initialIterations;
   const samples: Sample[] = [];
 
   for (let round = 0; round < options.rounds; round += 1) {
@@ -229,5 +276,6 @@ export function benchmark(
       rss: averageMemoryDelta('rss'),
     },
     checksum,
+    structure: samples.find((sample) => sample.structure !== null)?.structure ?? null,
   };
 }

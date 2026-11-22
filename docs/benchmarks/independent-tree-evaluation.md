@@ -10,6 +10,8 @@
 
 ## Scope
 
+This is the historical pre-correction benchmark baseline. The Node benchmark harness has since been corrected to move workload setup outside timed sections and to apply delete sequences consistently across adapters. Rerun the full evaluation before treating these figures as current release acceptance results.
+
 This evaluation compares separate B+ and RRB engines. Each implementation has its own node representation, build process, indexed navigation, update/insert/delete algorithms, range deletion and iterator. Both expose the same collection contract and preserve immutable roots.
 
 The benchmark covered point reads, point updates, inserts, deletes, batch updates, range deletion, sequential iteration and mixed operations. The primary JSON result contains every adapter/workload/dataset result and the actual sample duration. Some capped workloads completed below the 25ms target; actual durations are recorded per result. Point and range deletion were also run separately against an unchanged base collection, with calibrated samples; those results are in `independent-tree-deletions-node22.json` and supply the deletion rows below.

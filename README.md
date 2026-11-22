@@ -2,7 +2,7 @@
 
 Persistent vectors for large JavaScript and TypeScript datasets.
 
-ArrayForge keeps earlier versions of a collection available while you create updated ones. A point update copies only the affected page and the tree nodes along its path. Snapshots share the unchanged structure, so taking a snapshot is constant-time.
+ArrayForge keeps earlier versions of a collection available while you create updated ones. A point update copies the affected page and the tree nodes along its path. Unchanged parts of the structure are shared between versions, so creating a snapshot is constant-time.
 
 ## Install
 
@@ -30,7 +30,7 @@ console.log(nextUsers.get(1)?.name); // Grace Hopper
 
 ## Choose a tree
 
-`Vector.from()` chooses an implementation from the workload profile. The default profile is balanced.
+`Vector.from()` uses the RRB engine by default. The mutation-heavy profile selects B+; the other profiles select RRB.
 
 ```ts
 import { PROFILE, Vector } from 'arrayforge';
@@ -38,18 +38,19 @@ import { PROFILE, Vector } from 'arrayforge';
 const general = Vector.from(data);
 const batchWork = Vector.from(data, { profile: PROFILE.BATCH_HEAVY });
 const readWork = Vector.from(data, { profile: PROFILE.READ_HEAVY });
+const mutationWork = Vector.from(data, { profile: PROFILE.MUTATION_HEAVY });
 ```
 
-You can also choose the implementation directly:
+You can also choose an implementation directly:
 
 ```ts
 import { BPlusVector, RRBVector } from 'arrayforge';
 
 const indexedEdits = BPlusVector.from(data);
-const batchEdits = RRBVector.from(data);
+const sequenceWork = RRBVector.from(data);
 ```
 
-B+ and RRB vectors expose the same collection operations. Use the implementation that matches the work your application performs, or let `Vector` choose from a profile.
+Both engines expose the same collection operations. RRB is the default; B+ remains available when its stricter occupancy policy suits the workload better.
 
 ## Change the implementation later
 
@@ -99,12 +100,18 @@ const compact = Vector.from(data, {
 });
 ```
 
-The available sizes are `PAGE_SIZE.SMALL` (256), `PAGE_SIZE.MEDIUM` (512), and `PAGE_SIZE.LARGE` (1024). A custom numeric page size is also accepted.
+The built-in sizes are `PAGE_SIZE.SMALL` (256), `PAGE_SIZE.MEDIUM` (512), and `PAGE_SIZE.LARGE` (1024). Custom page sizes are also accepted when they are safe integers of at least four.
 
-## Learn more
+## Performance
+
+The checked-in Node benchmark runs cover 100K, 1M, 5M and 10M elements. They show where the two trees trade places rather than one implementation winning every workload. The results and the measurement limits are described in the [performance notes](docs/performance.md).
+
+## Documentation
 
 - [API reference](docs/api.md)
-- [Performance results](docs/performance.md)
+- [Architecture overview](docs/architecture/overview.md)
+- [Architecture decisions](docs/architecture/decisions.md)
+- [Performance notes](docs/performance.md)
 - [Benchmarking guide](docs/benchmarking.md)
 
 ArrayForge is released under the MIT license.

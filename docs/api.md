@@ -29,7 +29,7 @@ ArrayForge exposes immutable vectors backed by either a B+ tree or an RRB tree. 
 | `PAGE_SIZE.MEDIUM` | 512   |
 | `PAGE_SIZE.LARGE`  | 1024  |
 
-Custom numeric page sizes are supported. Values must be safe integers greater than or equal to four.
+Custom page sizes are supported. A page size and branch factor must each be safe integers greater than or equal to four.
 
 ## Construction
 
@@ -49,8 +49,8 @@ Automatic selection uses these defaults:
 
 | Profile          | Tree | Page size                                                 |
 | ---------------- | ---- | --------------------------------------------------------- |
-| `BALANCED`       | B+   | 256                                                       |
-| `READ_HEAVY`     | B+   | 512 below one million items; 1024 at or above one million |
+| `BALANCED`       | RRB  | 256                                                       |
+| `READ_HEAVY`     | RRB  | 512 below one million items; 1024 at or above one million |
 | `MUTATION_HEAVY` | B+   | 256                                                       |
 | `BATCH_HEAVY`    | RRB  | 256                                                       |
 
@@ -78,7 +78,7 @@ interface VectorOptions extends TreeOptions {
 }
 ```
 
-`Vector.from()` accepts `VectorOptions`. The concrete `BPlusVector.from()` and `RRBVector.from()` constructors accept `TreeOptions` and always create their named implementation.
+`Vector.from()` defaults to RRB, in accordance with ADR-008. The mutation-heavy profile selects B+; other automatic profiles select RRB. The concrete `BPlusVector.from()` and `RRBVector.from()` constructors accept `TreeOptions` and always create their named implementation. `branchFactor` defaults to 32.
 
 When `pageSize` is omitted, ArrayForge selects a page size from the profile and collection length. The collection exposes its selected value through `pageSize`.
 
@@ -99,9 +99,10 @@ All operations return a new collection when they change its contents. The source
 | `concat(other)`                        | Append an iterable of items                                 |
 | `snapshot()`                           | Return the current immutable version                        |
 | `toArray()`                            | Copy the collection into a JavaScript array                 |
+| `forEach(callback)`                    | Visit values and indexes without creating iterator results  |
 | `assertValid()`                        | Check the tree's structural invariants                      |
 
-Indexes for `get`, `set`, `insert`, `delete` and `deleteRange` are validated and invalid indexes throw `RangeError`. `slice` and `splice` use JavaScript-style negative-index and boundary normalization.
+`setMany()` accepts an array of `{ index, value }` changes or a `Map<number, T>`. Duplicate array indexes use last-write-wins semantics; a `Map` can be passed directly when writes are already deduplicated. Indexes for `get`, `set`, `insert`, `delete` and `deleteRange` are validated and invalid indexes throw `RangeError`. `slice` and `splice` use JavaScript-style negative-index and boundary normalization.
 
 `splice` returns the updated vector. It does not return the removed items or modify the source vector.
 
@@ -131,7 +132,7 @@ const batchOptimized = vector.withProfile(PROFILE.BATCH_HEAVY);
 const readOptimized = batchOptimized.withProfile(PROFILE.READ_HEAVY);
 ```
 
-A batch-heavy profile selects RRB. The other profiles select B+. The profile also selects the default page size. Use `convertTo()` when you want to choose the tree directly without applying a workload profile.
+The mutation-heavy profile selects B+. Balanced, read-heavy and batch-heavy profiles select RRB. The profile also selects the default page size. Use `convertTo()` when you want to choose the tree directly without applying a workload profile.
 
 ## Transactions
 
@@ -157,12 +158,16 @@ A builder can be committed or rolled back only once. Operations after it is clos
 
 ## Iteration
 
-Vectors implement `Iterable<T>` and return independent `IterableIterator<T>` instances.
+Vectors implement `Iterable<T>` and return independent `IterableIterator<T>` instances. `forEach()` traverses tree leaves directly and avoids allocating an iterator-result object for every value; use it for allocation-sensitive full scans.
 
 ```ts
 for (const item of vector) {
   consume(item);
 }
+
+vector.forEach((item, index) => {
+  consume(item, index);
+});
 
 const iterator = vector[Symbol.iterator]();
 const first = iterator.next();

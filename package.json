@@ -24,11 +24,14 @@
     "bench:browser:build": "vite build --config benchmarks/browser/vite.config.ts",
     "bench:trees": "node --experimental-strip-types src/cli.ts --sizes 100000,1000000 --adapter bplus-256,rrb-256,bplus-512,rrb-512,bplus-1024,rrb-1024 --rounds 11 --warmup 3 --target-ms 25",
     "bench:trees:large": "node --experimental-strip-types src/cli.ts --sizes 5000000 --adapter bplus-256,rrb-256,bplus-512,rrb-512,bplus-1024,rrb-1024 --rounds 11 --warmup 3 --target-ms 25",
+    "bench:structural": "node --expose-gc --experimental-strip-types scripts/benchmark-structural-ops.mjs",
     "profile:trees": "node --expose-gc --experimental-strip-types scripts/profile-trees.mjs",
     "profile:trees:large": "node --expose-gc --experimental-strip-types scripts/profile-trees.mjs --size 5000000 --updates 20000 --snapshots 64",
     "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && node scripts/rewrite-declarations.mjs",
     "prepack": "npm run build",
-    "verify:package": "npm pack --dry-run"
+    "verify:package": "npm pack --dry-run",
+    "bench:churn": "node --experimental-strip-types src/cli.ts --sizes 100000,1000000,5000000,10000000 --adapter bplus-256,rrb-256 --workload mutation-churn --rounds 7 --warmup 2 --iterations 20000 --format json --output docs/benchmarks/results/mutation-churn.json",
+    "bench:scale": "node --max-old-space-size=4096 --experimental-strip-types src/cli.ts --sizes 100000,1000000,5000000,10000000 --adapter bplus-256,rrb-256 --rounds 7 --warmup 2 --target-ms 25 --format json --output docs/benchmarks/results/scale-validation.json"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -58,6 +61,9 @@
     "docs/api.md",
     "docs/performance.md",
     "docs/benchmarking.md",
+    "docs/architecture/",
+    "docs/benchmarks/independent-tree-evaluation.md",
+    "docs/benchmarks/results/*.json",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"

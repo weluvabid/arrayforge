@@ -1,0 +1,147 @@
+{
+  "generatedAt": "2026-11-22T09:47:38.106Z",
+  "runtime": "v22.16.0",
+  "platform": "linux-x64",
+  "results": [
+    {
+      "adapter": "bplus-256",
+      "workload": "mutation-churn",
+      "size": 100000,
+      "rounds": 7,
+      "iterations": 20000,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 99.51887099999999,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.00497594355,
+        "p95": 0.011305633699999998,
+        "p99": 0.011305633699999998
+      },
+      "operationsPerSecond": 200966.910084822,
+      "memoryDeltaBytes": {
+        "heapUsed": 1744379.4285714286,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 730258.2857142857
+      },
+      "checksum": 23140104554,
+      "structure": {
+        "nodes": 628,
+        "leaves": 601,
+        "branches": 27,
+        "height": 2,
+        "minLeafOccupancy": 128,
+        "meanLeafOccupancy": 166.38935108153078,
+        "maxLeafOccupancy": 255,
+        "minBranchOccupancy": 20,
+        "meanBranchOccupancy": 23.22222222222222,
+        "maxBranchOccupancy": 26
+      }
+    },
+    {
+      "adapter": "rrb-256",
+      "workload": "mutation-churn",
+      "size": 100000,
+      "rounds": 7,
+      "iterations": 20000,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 62.17540300000019,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0031087701500000092,
+        "p95": 0.013788228049999999,
+        "p99": 0.013788228049999999
+      },
+      "operationsPerSecond": 321670.61305577605,
+      "memoryDeltaBytes": {
+        "heapUsed": -5930966.857142857,
+        "external": -357.85714285714283,
+        "arrayBuffers": 0,
+        "rss": -432420.5714285714
+      },
+      "checksum": 23140104554,
+      "structure": {
+        "nodes": 786,
+        "leaves": 757,
+        "branches": 29,
+        "height": 2,
+        "minLeafOccupancy": 106,
+        "meanLeafOccupancy": 132.1003963011889,
+        "maxLeafOccupancy": 256,
+        "minBranchOccupancy": 13,
+        "meanBranchOccupancy": 27.06896551724138,
+        "maxBranchOccupancy": 32
+      }
+    },
+    {
+      "adapter": "bplus-256",
+      "workload": "mutation-churn",
+      "size": 1000000,
+      "rounds": 7,
+      "iterations": 20000,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 182.0404290000006,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.009102021450000029,
+        "p95": 0.017041007000000014,
+        "p99": 0.017041007000000014
+      },
+      "operationsPerSecond": 109865.70461224268,
+      "memoryDeltaBytes": {
+        "heapUsed": -6454702.857142857,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 7471104
+      },
+      "checksum": 211955633988,
+      "structure": {
+        "nodes": 6103,
+        "leaves": 5847,
+        "branches": 256,
+        "height": 3,
+        "minLeafOccupancy": 128,
+        "meanLeafOccupancy": 171.02787754403968,
+        "maxLeafOccupancy": 256,
+        "minBranchOccupancy": 9,
+        "meanBranchOccupancy": 23.8359375,
+        "maxBranchOccupancy": 32
+      }
+    },
+    {
+      "adapter": "rrb-256",
+      "workload": "mutation-churn",
+      "size": 1000000,
+      "rounds": 7,
+      "iterations": 20000,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 497.16953600000124,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.024858476800000064,
+        "p95": 0.06864163195,
+        "p99": 0.06864163195
+      },
+      "operationsPerSecond": 40227.72626197263,
+      "memoryDeltaBytes": {
+        "heapUsed": -7435318.857142857,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 1348169.142857143
+      },
+      "checksum": 211955633988,
+      "structure": {
+        "nodes": 7111,
+        "leaves": 6852,
+        "branches": 259,
+        "height": 3,
+        "minLeafOccupancy": 64,
+        "meanLeafOccupancy": 145.94279042615295,
+        "maxLeafOccupancy": 256,
+        "minBranchOccupancy": 5,
+        "meanBranchOccupancy": 27.45173745173745,
+        "maxBranchOccupancy": 32
+      }
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "generatedAt": "2026-11-22T09:51:39.779Z",
+  "runtime": "v22.16.0",
+  "platform": "linux-x64",
+  "results": [
+    {
+      "adapter": "bplus-256",
+      "workload": "point-read",
+      "size": 1000000,
+      "rounds": 15,
+      "iterations": 100000,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 19.641508000000158,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.00019641508000000157,
+        "p95": 0.0012983775300000001,
+        "p99": 0.0012983775300000001
+      },
+      "operationsPerSecond": 5091258.777075528,
+      "memoryDeltaBytes": {
+        "heapUsed": 13628.266666666666,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 8738.133333333333
+      },
+      "checksum": 751462031940
+    },
+    {
+      "adapter": "rrb-256",
+      "workload": "point-read",
+      "size": 1000000,
+      "rounds": 15,
+      "iterations": 100000,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 19.09008300000005,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.00019090083000000048,
+        "p95": 0.00028126804999999876,
+        "p99": 0.00028126804999999876
+      },
+      "operationsPerSecond": 5238321.9077674905,
+      "memoryDeltaBytes": {
+        "heapUsed": 1776360,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 3620044.8
+      },
+      "checksum": 751462031940
+    }
+  ]
+}

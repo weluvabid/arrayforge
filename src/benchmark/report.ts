@@ -29,6 +29,16 @@ export function toCsv(results: readonly BenchmarkResult[]): string {
     'array_buffers_delta_bytes',
     'rss_delta_bytes',
     'checksum',
+    'nodes',
+    'leaves',
+    'branches',
+    'height',
+    'min_leaf_occupancy',
+    'mean_leaf_occupancy',
+    'max_leaf_occupancy',
+    'min_branch_occupancy',
+    'mean_branch_occupancy',
+    'max_branch_occupancy',
   ];
   const rows = results.map((result) =>
     [
@@ -49,6 +59,16 @@ export function toCsv(results: readonly BenchmarkResult[]): string {
       result.memoryDeltaBytes.arrayBuffers,
       result.memoryDeltaBytes.rss,
       result.checksum,
+      result.structure?.nodes ?? null,
+      result.structure?.leaves ?? null,
+      result.structure?.branches ?? null,
+      result.structure?.height ?? null,
+      result.structure?.minLeafOccupancy ?? null,
+      result.structure?.meanLeafOccupancy ?? null,
+      result.structure?.maxLeafOccupancy ?? null,
+      result.structure?.minBranchOccupancy ?? null,
+      result.structure?.meanBranchOccupancy ?? null,
+      result.structure?.maxBranchOccupancy ?? null,
     ]
       .map(escapeCsv)
       .join(','),
@@ -77,6 +97,13 @@ export function printTable(results: readonly BenchmarkResult[]): string {
       result.memoryDeltaBytes.arrayBuffers === null
         ? 'n/a'
         : (result.memoryDeltaBytes.arrayBuffers / 1_048_576).toFixed(2),
+    nodes: result.structure?.nodes.toLocaleString('en-US') ?? 'n/a',
+    'leaf min/avg/max': result.structure
+      ? `${result.structure.minLeafOccupancy}/${result.structure.meanLeafOccupancy.toFixed(1)}/${result.structure.maxLeafOccupancy}`
+      : 'n/a',
+    'branch min/avg/max': result.structure
+      ? `${result.structure.minBranchOccupancy}/${result.structure.meanBranchOccupancy.toFixed(1)}/${result.structure.maxBranchOccupancy}`
+      : 'n/a',
   }));
 
   if (rows.length === 0) {

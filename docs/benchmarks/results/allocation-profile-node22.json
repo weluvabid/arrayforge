@@ -1,0 +1,574 @@
+{
+  "generatedAt": "2026-11-22T09:54:36.895Z",
+  "runtime": "v22.16.0",
+  "platform": "linux-x64",
+  "configuration": {
+    "size": 1000000,
+    "pageSize": 256,
+    "updates": 10000,
+    "retainedSnapshots": 64,
+    "samplingIntervalBytes": 4096,
+    "explicitGc": true
+  },
+  "allocationProfiles": [
+    {
+      "kind": "bplus",
+      "updateDurationMs": 29.340168000000006,
+      "iterationDurationMs": 19.36172099999999,
+      "visitorDurationMs": 11.848471000000018,
+      "churnDurationMs": 128.76665300000002,
+      "checksum": 6060709080000,
+      "updateAllocations": [
+        {
+          "functionName": "setNode (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 38990600,
+          "samples": 7377
+        },
+        {
+          "functionName": "set (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 2219408,
+          "samples": 538
+        },
+        {
+          "functionName": "BPlusVectorImpl (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 24112,
+          "samples": 5
+        },
+        {
+          "functionName": "post (node:inspector)",
+          "sampledBytes": 18320,
+          "samples": 2
+        },
+        {
+          "functionName": "(root) (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "(anonymous) (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "profileAllocations (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "stopSampling (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "post (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "Promise (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "(anonymous) (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 0,
+          "samples": 0
+        }
+      ],
+      "iterationAllocations": [
+        {
+          "functionName": "profileAllocations (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 39794312,
+          "samples": 9666
+        },
+        {
+          "functionName": "next (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 16679288,
+          "samples": 4044
+        },
+        {
+          "functionName": "(root) (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "(anonymous) (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        }
+      ],
+      "visitorAllocations": [
+        {
+          "functionName": "forEachNode (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 13793952,
+          "samples": 3352
+        },
+        {
+          "functionName": "(anonymous) (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 1085056,
+          "samples": 263
+        },
+        {
+          "functionName": "(root) (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "(anonymous) (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "profileAllocations (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "forEach (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 0,
+          "samples": 0
+        }
+      ],
+      "churnAllocations": [
+        {
+          "functionName": "deleteNode (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 31044688,
+          "samples": 6425
+        },
+        {
+          "functionName": "insertNode (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 21083120,
+          "samples": 5004
+        },
+        {
+          "functionName": "insertValue (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 12168456,
+          "samples": 2260
+        },
+        {
+          "functionName": "combineSiblings (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 3768864,
+          "samples": 715
+        },
+        {
+          "functionName": "removeValue (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 2583888,
+          "samples": 471
+        },
+        {
+          "functionName": "branch (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 1788584,
+          "samples": 428
+        },
+        {
+          "functionName": "leaf (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 696648,
+          "samples": 168
+        },
+        {
+          "functionName": "delete (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 530432,
+          "samples": 128
+        },
+        {
+          "functionName": "profileAllocations (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 510240,
+          "samples": 124
+        },
+        {
+          "functionName": "insert (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 509712,
+          "samples": 123
+        },
+        {
+          "functionName": "replacePair (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 339568,
+          "samples": 81
+        },
+        {
+          "functionName": "min (native)",
+          "sampledBytes": 143632,
+          "samples": 18
+        },
+        {
+          "functionName": "normalizeRoot (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 27360,
+          "samples": 5
+        },
+        {
+          "functionName": "imul (native)",
+          "sampledBytes": 10584,
+          "samples": 2
+        },
+        {
+          "functionName": "ceil (native)",
+          "sampledBytes": 4608,
+          "samples": 1
+        },
+        {
+          "functionName": "#assertInsertIndex (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 4480,
+          "samples": 1
+        },
+        {
+          "functionName": "BPlusVectorImpl (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 4224,
+          "samples": 1
+        },
+        {
+          "functionName": "rebalanceChild (file:///mnt/data/arrayforge-final-work/src/persistent/tree.ts)",
+          "sampledBytes": 4160,
+          "samples": 1
+        },
+        {
+          "functionName": "values (native)",
+          "sampledBytes": 4128,
+          "samples": 1
+        },
+        {
+          "functionName": "next (native)",
+          "sampledBytes": 4120,
+          "samples": 1
+        }
+      ],
+      "churnStructure": {
+        "nodes": 5961,
+        "leaves": 5705,
+        "branches": 256,
+        "height": 3,
+        "minLeafOccupancy": 128,
+        "meanLeafOccupancy": 175.28483786152498,
+        "maxLeafOccupancy": 256,
+        "minBranchOccupancy": 9,
+        "meanBranchOccupancy": 23.28125,
+        "maxBranchOccupancy": 32
+      }
+    },
+    {
+      "kind": "rrb",
+      "updateDurationMs": 35.26903900000002,
+      "iterationDurationMs": 9.332720999999992,
+      "visitorDurationMs": 11.167110999999977,
+      "churnDurationMs": 127.49674399999981,
+      "checksum": 6060709080000,
+      "updateAllocations": [
+        {
+          "functionName": "write (file:///mnt/data/arrayforge-final-work/src/persistent/rrb.ts)",
+          "sampledBytes": 39290224,
+          "samples": 7412
+        },
+        {
+          "functionName": "set (file:///mnt/data/arrayforge-final-work/src/persistent/rrb.ts)",
+          "sampledBytes": 2318752,
+          "samples": 562
+        },
+        {
+          "functionName": "get length (file:///mnt/data/arrayforge-final-work/src/persistent/rrb.ts)",
+          "sampledBytes": 45232,
+          "samples": 4
+        },
+        {
+          "functionName": "RrbVectorImpl (file:///mnt/data/arrayforge-final-work/src/persistent/rrb.ts)",
+          "sampledBytes": 28520,
+          "samples": 5
+        },
+        {
+          "functionName": "post (node:inspector)",
+          "sampledBytes": 14584,
+          "samples": 2
+        },
+        {
+          "functionName": "(root) (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "(anonymous) (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "profileAllocations (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "stopSampling (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "post (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "Promise (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "(anonymous) (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 0,
+          "samples": 0
+        }
+      ],
+      "iterationAllocations": [
+        {
+          "functionName": "profileAllocations (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 48945520,
+          "samples": 11887
+        },
+        {
+          "functionName": "next (file:///mnt/data/arrayforge-final-work/src/persistent/rrb.ts)",
+          "sampledBytes": 6947408,
+          "samples": 1681
+        },
+        {
+          "functionName": "(root) (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "(anonymous) (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        }
+      ],
+      "visitorAllocations": [
+        {
+          "functionName": "forEachNode (file:///mnt/data/arrayforge-final-work/src/persistent/rrb.ts)",
+          "sampledBytes": 14031488,
+          "samples": 3407
+        },
+        {
+          "functionName": "(anonymous) (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 666040,
+          "samples": 161
+        },
+        {
+          "functionName": "(root) (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "(anonymous) (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "profileAllocations (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "forEach (file:///mnt/data/arrayforge-final-work/src/persistent/rrb.ts)",
+          "sampledBytes": 0,
+          "samples": 0
+        }
+      ],
+      "churnAllocations": [
+        {
+          "functionName": "remove (file:///mnt/data/arrayforge-final-work/src/persistent/rrb.ts)",
+          "sampledBytes": 30270408,
+          "samples": 6155
+        },
+        {
+          "functionName": "insert (file:///mnt/data/arrayforge-final-work/src/persistent/rrb.ts)",
+          "sampledBytes": 21771624,
+          "samples": 5191
+        },
+        {
+          "functionName": "insertValue (file:///mnt/data/arrayforge-final-work/src/persistent/rrb.ts)",
+          "sampledBytes": 11746488,
+          "samples": 2223
+        },
+        {
+          "functionName": "rebalanceChildren (file:///mnt/data/arrayforge-final-work/src/persistent/rrb.ts)",
+          "sampledBytes": 3986480,
+          "samples": 686
+        },
+        {
+          "functionName": "delete (file:///mnt/data/arrayforge-final-work/src/persistent/rrb.ts)",
+          "sampledBytes": 2501376,
+          "samples": 606
+        },
+        {
+          "functionName": "next (native)",
+          "sampledBytes": 2467880,
+          "samples": 599
+        },
+        {
+          "functionName": "slice (native)",
+          "sampledBytes": 1152856,
+          "samples": 259
+        },
+        {
+          "functionName": "removeValue (file:///mnt/data/arrayforge-final-work/src/persistent/rrb.ts)",
+          "sampledBytes": 1124616,
+          "samples": 223
+        },
+        {
+          "functionName": "makeBranch (file:///mnt/data/arrayforge-final-work/src/persistent/rrb.ts)",
+          "sampledBytes": 1090240,
+          "samples": 255
+        },
+        {
+          "functionName": "makeLeaf (file:///mnt/data/arrayforge-final-work/src/persistent/rrb.ts)",
+          "sampledBytes": 836512,
+          "samples": 192
+        },
+        {
+          "functionName": "profileAllocations (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 474272,
+          "samples": 115
+        },
+        {
+          "functionName": "replacePair (file:///mnt/data/arrayforge-final-work/src/persistent/rrb.ts)",
+          "sampledBytes": 323024,
+          "samples": 77
+        },
+        {
+          "functionName": "values (native)",
+          "sampledBytes": 20640,
+          "samples": 5
+        },
+        {
+          "functionName": "imul (native)",
+          "sampledBytes": 16144,
+          "samples": 3
+        },
+        {
+          "functionName": "delete (native)",
+          "sampledBytes": 4104,
+          "samples": 1
+        },
+        {
+          "functionName": "(root) (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "(anonymous) (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "startSampling (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "post (file:///mnt/data/arrayforge-final-work/scripts/profile-trees.mjs)",
+          "sampledBytes": 0,
+          "samples": 0
+        },
+        {
+          "functionName": "Promise (native)",
+          "sampledBytes": 0,
+          "samples": 0
+        }
+      ],
+      "churnStructure": {
+        "nodes": 5996,
+        "leaves": 5741,
+        "branches": 255,
+        "height": 3,
+        "minLeafOccupancy": 128,
+        "meanLeafOccupancy": 174.18568193694477,
+        "maxLeafOccupancy": 256,
+        "minBranchOccupancy": 10,
+        "meanBranchOccupancy": 23.50980392156863,
+        "maxBranchOccupancy": 32
+      }
+    }
+  ],
+  "transactionProfiles": [
+    {
+      "kind": "bplus",
+      "updates": 10000,
+      "rounds": 5,
+      "sequentialDurationMs": 12.700924999999984,
+      "transactionDurationMs": 7.081759000000147,
+      "speedup": 1.7934703793223858,
+      "checksum": 10049995000
+    },
+    {
+      "kind": "rrb",
+      "updates": 10000,
+      "rounds": 5,
+      "sequentialDurationMs": 11.942882999999938,
+      "transactionDurationMs": 7.878101000000015,
+      "speedup": 1.5159596202181103,
+      "checksum": 10049995000
+    }
+  ],
+  "retentionProfiles": [
+    {
+      "kind": "bplus",
+      "baseline": {
+        "heapUsed": 26605544,
+        "external": 10480383,
+        "arrayBuffers": 10483,
+        "rss": 169820160
+      },
+      "afterRetainingSnapshots": {
+        "heapUsed": 26849616,
+        "external": 10480423,
+        "arrayBuffers": 10483,
+        "rss": 169820160
+      },
+      "retainedDelta": {
+        "heapUsed": 244072,
+        "external": 40,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "afterReleasingSnapshots": {
+        "heapUsed": 26607968,
+        "external": 10480423,
+        "arrayBuffers": 10483,
+        "rss": 169820160
+      },
+      "releasedDelta": {
+        "heapUsed": 2424,
+        "external": 40,
+        "arrayBuffers": 0,
+        "rss": 0
+      }
+    },
+    {
+      "kind": "rrb",
+      "baseline": {
+        "heapUsed": 21082784,
+        "external": 10477069,
+        "arrayBuffers": 10483,
+        "rss": 218439680
+      },
+      "afterRetainingSnapshots": {
+        "heapUsed": 21326936,
+        "external": 10477069,
+        "arrayBuffers": 10483,
+        "rss": 218439680
+      },
+      "retainedDelta": {
+        "heapUsed": 244152,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "afterReleasingSnapshots": {
+        "heapUsed": 21083536,
+        "external": 10477069,
+        "arrayBuffers": 10483,
+        "rss": 218439680
+      },
+      "releasedDelta": {
+        "heapUsed": 752,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      }
+    }
+  ]
+}

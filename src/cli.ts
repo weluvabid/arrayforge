@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { loadAdapters } from './benchmark/adapters.ts';
-import { benchmark } from './benchmark/measure.ts';
+import { benchmark, maximumIterations } from './benchmark/measure.ts';
 import { printTable, toCsv } from './benchmark/report.ts';
 import { workloadNames } from './benchmark/workloads.ts';
 import type { BenchmarkOptions, WorkloadName } from './benchmark/types.ts';
@@ -209,10 +209,15 @@ async function main(): Promise<void> {
 
     for (const adapter of adapters) {
       for (const workload of args.workloads) {
-        const iterations = args.iterations;
+        const iterations =
+          args.iterations === null
+            ? null
+            : Math.min(args.iterations, maximumIterations(workload, size));
         process.stderr.write(
           `Running ${adapter.name} / ${workload} / ${size.toLocaleString('en-US')} ` +
-            `(${iterations === null ? `calibrated to ${args.targetSampleMs}ms` : `${iterations} ops`})\n`,
+            `(${
+              iterations === null ? `calibrated to ${args.targetSampleMs}ms` : `${iterations} ops`
+            })\n`,
         );
         results.push(benchmark(adapter, workload, options, iterations ?? undefined));
       }

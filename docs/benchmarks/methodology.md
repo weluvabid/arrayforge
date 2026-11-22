@@ -1,6 +1,6 @@
 # Benchmark methodology
 
-The benchmark lab provides a consistent set of workloads for comparing collection strategies.
+The benchmark lab compares the persistent tree implementations with several common collection strategies. It is intended for repeatable comparisons on the same runtime and machine, not as a universal ranking across environments.
 
 ## Adapters
 
@@ -9,57 +9,52 @@ The benchmark lab provides a consistent set of workloads for comparing collectio
 - `immer` — Immer `produce`.
 - `mutative` — Mutative `create`.
 - `immutable-js` — Immutable.js `List`.
+- `bplus-*` and `rrb-*` — ArrayForge's independent persistent tree engines at the named page capacity.
 
 ## Workloads
 
-| Workload               | Operation                                           |
-| ---------------------- | --------------------------------------------------- |
-| `point-read`           | Random indexed reads                                |
-| `point-update`         | Repeated single-element updates                     |
-| `point-insert`         | Repeated middle insertions                          |
-| `point-delete`         | Repeated middle deletions                           |
-| `batch-update`         | Update up to 1,000 selected indexes per transaction |
-| `range-delete`         | Delete a contiguous range                           |
-| `snapshot`             | Retain multiple snapshots of one collection         |
-| `sequential-iteration` | Traverse the collection                             |
-| `mixed-operations`     | 70% reads, 20% updates, 5% inserts, 5% deletes      |
+| Workload               | What it measures                                                  |
+| ---------------------- | ----------------------------------------------------------------- |
+| `construction`         | Building a collection from an existing values array               |
+| `point-read`           | Seeded random indexed reads                                       |
+| `point-update`         | Repeated single-item updates                                      |
+| `point-insert`         | Repeated insertions                                               |
+| `point-delete`         | Sequential deletions from the evolving collection                 |
+| `batch-update`         | Groups of indexed writes, with alternating values between passes  |
+| `range-delete`         | Sequential removal of contiguous ranges                           |
+| `snapshot`             | Retaining multiple immutable versions                             |
+| `sequential-iteration` | Full traversal through the iterator protocol                      |
+| `sequential-visit`     | Full traversal through direct callback visitation (`forEach`)     |
+| `mixed-operations`     | A seeded mix of 70% reads, 20% updates, 5% inserts and 5% deletes |
+| `mutation-churn`       | Random delete/insert pairs that preserve collection length        |
 
-The random workload uses a seeded generator. The same seed produces the same index sequence across adapters.
+Workload-specific setup and seeded index sequences are prepared outside the measured section. Non-construction workloads create their initial collection before timing. Construction times collection creation itself. Delete and range-delete operations apply to the evolving collection for every adapter.
 
 ## Measurements
 
-Each result includes p50, p95 and p99 per-operation latency, median operations per second, the measured sample duration, memory deltas and a checksum. JSON reports also include the Node.js version and platform.
+Each result records the number of measured rounds and iterations, sample duration, p50/p95/p99 of the per-iteration sample latency, operations per second, memory deltas, checksum and—when supported—post-workload tree structure statistics.
 
-By default, the harness calibrates operation counts to a 25 ms measured sample. This gives short operations enough repetitions to produce useful timings while keeping expensive operations bounded. Workloads that consume collection contents or retain snapshots have workload-specific iteration limits. Use `--iterations` to set a fixed operation count, or `--target-ms` to change the target duration.
+The Node runner calibrates iteration counts toward a 25 ms sample by default, subject to workload-specific caps. Use `--iterations` to set a fixed count or `--target-ms` to change the target duration. A workload that hits an iteration cap can finish below the target duration; the actual duration is recorded.
 
-Memory changes are sampled before and after each round. With explicit GC enabled, heap, external and ArrayBuffer measurements describe the post-round retained-memory delta; they are not total allocation counts. Without explicit GC, the deltas also reflect garbage-collection timing. RSS shows the process-level change. Run Node with `--expose-gc` when you want the harness to request garbage collection before and after each measured round. The report records whether explicit GC was available:
+Percentiles are calculated across measured rounds. They are not per-operation traces, and p95/p99 are not meaningful when the run has only a handful of rounds. Increase `--rounds` for tail comparisons.
 
-```sh
-node --expose-gc --experimental-strip-types src/cli.ts --sizes 100000,1000000
-```
+## Memory and allocation
 
-Use the same runtime, hardware, dataset, warm-up, rounds and target duration for comparisons. Close other CPU-heavy applications and repeat runs when results are close. Percentiles are calculated across measured rounds, so increase `--rounds` when tail-latency estimates matter.
+The regular benchmark records memory before and after each round. Without explicit GC, those deltas are affected by garbage-collection timing and should not be interpreted as allocation volume or stable retained memory. Run with `--expose-gc` to request collection around measured rounds; even then, the delta describes retained memory, not all allocations made during the workload.
 
-## Browser runs
-
-The browser page compares native arrays, Immer, Mutative and Immutable.js using the same workload definitions. Browser runs use the workload's fixed default iteration count rather than the Node runner's duration calibration. Heap values are shown when the browser exposes `performance.memory`. Browser results include the user agent and hardware concurrency in the exported JSON.
-
-## Example commands
-
-```sh
-pnpm bench -- --size 1000000 --workload point-update --rounds 21 --target-ms 50
-pnpm bench -- --sizes 100000,1000000 --adapter native-copy,immer,mutative,immutable-js --format json --output reports/collections.json
-```
-
-## Tree allocation and retained-memory profiling
-
-Use the dedicated V8 sampling profiler to compare the 256-element B+ and RRB candidates:
+Use the dedicated V8 sampling profiler for allocation attribution:
 
 ```sh
 pnpm profile:trees
 pnpm profile:trees:large
 ```
 
-The profiler runs with `--expose-gc`, samples V8 allocations during a deterministic point-update sequence, reports the largest sampled allocation sites, and times a full traversal. It then retains a sequence of persistent versions, forces collection, records the retained heap, releases those versions, and measures again while keeping the base vector alive.
+The profiler samples allocations during point updates, iterator traversal, callback traversal and mutation churn. V8 sampling is statistical, not an exact count of every allocation. The same script also retains snapshots, forces collection and measures the extra live heap while keeping the base vector alive.
 
-`sampledAllocations` is V8's statistical allocation sample, not an exact count of every allocation. `retainedDelta` measures the extra live memory held by the retained versions after collection. `releasedDelta` shows the remaining change after the snapshots are released. Compare candidates in the same Node version and process conditions; use multiple runs when the differences are small.
+## Browser runs
+
+Start the browser benchmark page with `pnpm bench:browser` and build it with `pnpm bench:browser:build`. The browser runner uses fixed workload iteration counts rather than the Node runner's duration calibration. It reports the user agent and hardware concurrency. Heap usage is shown only when the browser exposes `performance.memory`; browser runs do not force garbage collection.
+
+## Reproducibility
+
+Use the same runtime, hardware, dataset, seed, warm-up count, measured rounds and target duration. Close CPU-heavy applications and repeat runs when differences are small. Record the runtime and platform with exported results.

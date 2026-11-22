@@ -3,6 +3,7 @@ import {
   RrbVector,
   type PersistentTreeVector,
   type TreeOptions,
+  type TreeStructureStats,
 } from '../persistent/tree.ts';
 import type { CollectionAdapter } from '../benchmark/types.ts';
 
@@ -28,6 +29,14 @@ function createAdapter(
       (collection as PersistentTreeVector<number>).setMany(changes),
     snapshot: (collection) => (collection as PersistentTreeVector<number>).snapshot(),
     iterate: (collection) => collection as Iterable<number>,
+    forEach: (collection, callback) =>
+      (collection as PersistentTreeVector<number>).forEach(callback),
+    inspect: (collection) =>
+      (
+        collection as PersistentTreeVector<number> & {
+          inspectStructure(): TreeStructureStats;
+        }
+      ).inspectStructure(),
   };
 }
 

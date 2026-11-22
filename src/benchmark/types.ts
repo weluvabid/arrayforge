@@ -3,6 +3,19 @@ export interface Change {
   readonly value: number;
 }
 
+export interface StructureStats {
+  readonly nodes: number;
+  readonly leaves: number;
+  readonly branches: number;
+  readonly height: number;
+  readonly minLeafOccupancy: number;
+  readonly meanLeafOccupancy: number;
+  readonly maxLeafOccupancy: number;
+  readonly minBranchOccupancy: number;
+  readonly meanBranchOccupancy: number;
+  readonly maxBranchOccupancy: number;
+}
+
 export interface CollectionAdapter {
   readonly name: string;
   readonly description: string;
@@ -16,9 +29,12 @@ export interface CollectionAdapter {
   updateMany(collection: unknown, changes: readonly Change[]): unknown;
   snapshot(collection: unknown): unknown;
   iterate(collection: unknown): Iterable<number>;
+  forEach?(collection: unknown, callback: (value: number, index: number) => void): void;
+  inspect?(collection: unknown): StructureStats;
 }
 
 export type WorkloadName =
+  | 'construction'
   | 'point-read'
   | 'point-update'
   | 'point-insert'
@@ -27,7 +43,9 @@ export type WorkloadName =
   | 'range-delete'
   | 'snapshot'
   | 'sequential-iteration'
-  | 'mixed-operations';
+  | 'sequential-visit'
+  | 'mixed-operations'
+  | 'mutation-churn';
 
 export interface BenchmarkOptions {
   readonly size: number;
@@ -59,6 +77,7 @@ export interface BenchmarkResult {
     readonly rss: number | null;
   };
   readonly checksum: number;
+  readonly structure: StructureStats | null;
 }
 
 export interface AdapterLoadResult {

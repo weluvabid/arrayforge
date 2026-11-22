@@ -22,7 +22,10 @@ function copyDelete(collection: number[], index: number): number[] {
 }
 
 function copyDeleteRange(collection: number[], start: number, end: number): number[] {
-  return collection.slice(0, start).concat(collection.slice(end));
+  const next = collection.slice();
+  next.splice(start, end - start);
+
+  return next;
 }
 
 function copyUpdateMany(collection: number[], changes: readonly Change[]): number[] {
@@ -48,6 +51,7 @@ export const nativeCopyAdapter: CollectionAdapter = {
   updateMany: (collection, changes) => copyUpdateMany(collection as number[], changes),
   snapshot: (collection) => (collection as number[]).slice(),
   iterate: (collection) => collection as number[],
+  forEach: (collection, callback) => (collection as number[]).forEach(callback),
 };
 
 export const nativeMutableAdapter: CollectionAdapter = {
@@ -87,4 +91,5 @@ export const nativeMutableAdapter: CollectionAdapter = {
   },
   snapshot: (collection) => (collection as number[]).slice(),
   iterate: (collection) => collection as number[],
+  forEach: (collection, callback) => (collection as number[]).forEach(callback),
 };

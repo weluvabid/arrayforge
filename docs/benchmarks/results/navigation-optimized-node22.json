@@ -1,0 +1,77 @@
+{
+  "generatedAt": "2026-11-22T09:51:40.845Z",
+  "runtime": "v22.16.0",
+  "platform": "linux-x64",
+  "results": [
+    {
+      "adapter": "bplus-256",
+      "workload": "point-read",
+      "size": 1000000,
+      "rounds": 15,
+      "iterations": 100000,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 12.083433000000014,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.00012083433000000013,
+        "p95": 0.0001700551200000001,
+        "p99": 0.0001700551200000001
+      },
+      "operationsPerSecond": 8275793.8079352025,
+      "memoryDeltaBytes": {
+        "heapUsed": -336340.8,
+        "external": -2.6666666666666665,
+        "arrayBuffers": 0,
+        "rss": 471859.2
+      },
+      "checksum": 751462031940,
+      "structure": {
+        "nodes": 4035,
+        "leaves": 3907,
+        "branches": 128,
+        "height": 3,
+        "minLeafOccupancy": 255,
+        "meanLeafOccupancy": 255.9508574353724,
+        "maxLeafOccupancy": 256,
+        "minBranchOccupancy": 4,
+        "meanBranchOccupancy": 31.515625,
+        "maxBranchOccupancy": 32
+      }
+    },
+    {
+      "adapter": "rrb-256",
+      "workload": "point-read",
+      "size": 1000000,
+      "rounds": 15,
+      "iterations": 100000,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 16.80964800000004,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.00016809648000000037,
+        "p95": 0.00042243470000000004,
+        "p99": 0.00042243470000000004
+      },
+      "operationsPerSecond": 5948964.547026789,
+      "memoryDeltaBytes": {
+        "heapUsed": 1196398.4,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 4669986.133333334
+      },
+      "checksum": 751462031940,
+      "structure": {
+        "nodes": 4035,
+        "leaves": 3907,
+        "branches": 128,
+        "height": 3,
+        "minLeafOccupancy": 64,
+        "meanLeafOccupancy": 255.9508574353724,
+        "maxLeafOccupancy": 256,
+        "minBranchOccupancy": 3,
+        "meanBranchOccupancy": 31.515625,
+        "maxBranchOccupancy": 32
+      }
+    }
+  ]
+}

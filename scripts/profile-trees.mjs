@@ -103,8 +103,8 @@ function createVector(kind, values) {
 async function startSampling(session) {
   await post(session, 'HeapProfiler.startSampling', {
     samplingInterval: SAMPLE_INTERVAL,
-    includeObjectsCollectedByMajorGC: false,
-    includeObjectsCollectedByMinorGC: false,
+    includeObjectsCollectedByMajorGC: true,
+    includeObjectsCollectedByMinorGC: true,
   });
 }
 
@@ -151,13 +151,23 @@ async function profileAllocations(kind, values) {
 
     const iterationAllocations = await stopSampling(session);
 
+    await startSampling(session);
+    let visitorChecksum = 0;
+    vector.forEach((value) => {
+      visitorChecksum += value;
+    });
+    const visitorAllocations = await stopSampling(session);
+
     for (let warmup = 0; warmup < 3; warmup += 1) {
       for (const value of vector) {
         void value;
       }
+
+      vector.forEach(() => undefined);
     }
 
     const iterationDurations = [];
+    const visitorDurations = [];
     let checksum = 0;
 
     for (let round = 0; round < 5; round += 1) {
@@ -170,17 +180,49 @@ async function profileAllocations(kind, values) {
 
       iterationDurations.push(performance.now() - iterationStartedAt);
       checksum += roundChecksum;
+
+      const visitorStartedAt = performance.now();
+      let roundVisitorChecksum = 0;
+      vector.forEach((value) => {
+        roundVisitorChecksum += value;
+      });
+      visitorDurations.push(performance.now() - visitorStartedAt);
+      checksum += roundVisitorChecksum;
     }
 
     const iterationDurationMs = median(iterationDurations);
+    const visitorDurationMs = median(visitorDurations);
+
+    let churnVector = createVector(kind, values);
+    let state = 0x9e3779b9;
+    await startSampling(session);
+    const churnStartedAt = performance.now();
+
+    for (let index = 0; index < UPDATES; index += 1) {
+      state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+      const deleteIndex = state % churnVector.length;
+      churnVector = churnVector.delete(deleteIndex);
+      state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+      const insertIndex = state % (churnVector.length + 1);
+      churnVector = churnVector.insert(insertIndex, SIZE + index);
+    }
+
+    const churnDurationMs = performance.now() - churnStartedAt;
+    const churnAllocations = await stopSampling(session);
+    churnVector.assertValid();
 
     return {
       kind,
       updateDurationMs,
       iterationDurationMs,
-      checksum: checksum + sampledChecksum,
+      visitorDurationMs,
+      churnDurationMs,
+      checksum: checksum + sampledChecksum + visitorChecksum,
       updateAllocations,
       iterationAllocations,
+      visitorAllocations,
+      churnAllocations,
+      churnStructure: churnVector.inspectStructure(),
     };
   } finally {
     session.disconnect();

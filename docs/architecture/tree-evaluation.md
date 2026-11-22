@@ -22,7 +22,8 @@ ArrayForge now contains two independent persistent sequence implementations. The
 - Internal nodes store cumulative subtree-size tables for relaxed indexed navigation.
 - Branches may have relaxed occupancy while all leaves remain at the same depth.
 - Insertions split overflowing pages and branches along the affected path.
-- Deletions remove empty nodes and collapse single-child roots without forcing sibling rebalancing.
+- Point and range deletions rebalance underfilled adjacent siblings by redistribution or merging, while retaining relaxed subtree-size metadata.
+- Single-child roots are collapsed after deletion.
 - Unchanged subtrees remain shared.
 
 The implementations no longer route through a shared tree class or node representation. `PersistentTreeVector` is the shared public contract; `BPlusVector` and `RrbVector` instantiate separate engines.
@@ -31,9 +32,9 @@ The implementations no longer route through a shared tree class or node represen
 
 **RRB is the primary vector implementation.** `Vector.from()` selects RRB. B+ remains available as an alternative for workloads that benefit from stricter occupancy and point-mutation behaviour.
 
-The decision uses the 100K, 1M and 5M benchmark comparison, structural correctness tests and controlled-GC retention profiling. RRB performs particularly well on range deletion and large-dataset reads/iteration. B+ remains competitive on point updates and mixed workloads at some sizes. Across the tested page capacities, RRB offered the stronger overall balance for the target persistent-sequence workload.
+The default decision combines the earlier 100K, 1M and 5M comparison with structural correctness and retention profiling. Later scale runs extend to 10M and show that the workload split is real: RRB is often strong on reads, insertions and callback traversal, while B+ can lead on point updates, deletes, batches or range deletion. Neither engine wins every workload; RRB remains the general default and B+ is available for workloads that favour its balancing policy.
 
-The detailed measurements are in [`docs/benchmarks/independent-tree-evaluation.md`](../benchmarks/independent-tree-evaluation.md), with machine-readable results in `docs/benchmarks/results/independent-tree-evaluation-node22.json`.
+The earlier independent comparison is retained in [`docs/benchmarks/independent-tree-evaluation.md`](../benchmarks/independent-tree-evaluation.md). The later navigation, churn, allocation and scale measurements are summarized in [`docs/performance.md`](../performance.md), with their raw results under `docs/benchmarks/results/`.
 
 ## Page sizing
 
@@ -51,7 +52,7 @@ The capacity is selected at construction and remains stable for the vector's lif
 Vector.from(values);
 Vector.from(values, { profile: 'mutation-heavy' });
 Vector.from(values, { profile: 'read-heavy' });
-BPlusVector.from(values, { pageCapacity: 512 });
+BPlusVector.from(values, { pageSize: 512 });
 ```
 
 ## Complexity
@@ -98,6 +99,6 @@ Both engines expose `assertValid()` for structural verification.
 - All children of a branch have the same height/level.
 - No published node or page is mutated.
 - B+ non-root leaves and branches satisfy minimum occupancy.
-- RRB nodes satisfy fanout bounds and relaxed subtree-size metadata.
+- RRB nodes satisfy fanout bounds, equal leaf depth and relaxed subtree-size metadata.
 - Empty subtrees are removed and the root is collapsed where possible.
 - Randomized edits are checked against a native-array reference model.

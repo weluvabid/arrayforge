@@ -25,6 +25,19 @@ export type Profile = (typeof PROFILE)[keyof typeof PROFILE];
 export type PageProfile = Profile;
 export type PageSize = (typeof PAGE_SIZE)[keyof typeof PAGE_SIZE] | number;
 
+export interface TreeStructureStats {
+  readonly nodes: number;
+  readonly leaves: number;
+  readonly branches: number;
+  readonly height: number;
+  readonly minLeafOccupancy: number;
+  readonly meanLeafOccupancy: number;
+  readonly maxLeafOccupancy: number;
+  readonly minBranchOccupancy: number;
+  readonly meanBranchOccupancy: number;
+  readonly maxBranchOccupancy: number;
+}
+
 export interface TreeOptions {
   readonly pageSize?: PageSize;
   readonly profile?: PageProfile;
@@ -112,15 +125,117 @@ interface BranchNode<T> {
   readonly kind: 'branch';
   readonly children: readonly TreeNode<T>[];
   readonly sizes: readonly number[];
+  readonly uniformChildLength: number;
   readonly length: number;
   readonly height: number;
 }
 
 type TreeNode<T> = LeafNode<T> | BranchNode<T>;
 
+function inspectTree<T>(root: TreeNode<T>): TreeStructureStats {
+  const pending: TreeNode<T>[] = [root];
+  let nodes = 0;
+  let leaves = 0;
+  let branches = 0;
+  let leafItems = 0;
+  let branchChildren = 0;
+  let minLeafOccupancy = Number.POSITIVE_INFINITY;
+  let maxLeafOccupancy = 0;
+  let minBranchOccupancy = Number.POSITIVE_INFINITY;
+  let maxBranchOccupancy = 0;
+
+  while (pending.length > 0) {
+    const node = pending.pop() as TreeNode<T>;
+    nodes += 1;
+
+    if (node.kind === 'leaf') {
+      leaves += 1;
+      leafItems += node.items.length;
+      minLeafOccupancy = Math.min(minLeafOccupancy, node.items.length);
+      maxLeafOccupancy = Math.max(maxLeafOccupancy, node.items.length);
+      continue;
+    }
+
+    branches += 1;
+    branchChildren += node.children.length;
+    minBranchOccupancy = Math.min(minBranchOccupancy, node.children.length);
+    maxBranchOccupancy = Math.max(maxBranchOccupancy, node.children.length);
+
+    for (const child of node.children) {
+      pending.push(child);
+    }
+  }
+
+  return {
+    nodes,
+    leaves,
+    branches,
+    height: root.height,
+    minLeafOccupancy: leaves === 0 ? 0 : minLeafOccupancy,
+    meanLeafOccupancy: leaves === 0 ? 0 : leafItems / leaves,
+    maxLeafOccupancy,
+    minBranchOccupancy: branches === 0 ? 0 : minBranchOccupancy,
+    meanBranchOccupancy: branches === 0 ? 0 : branchChildren / branches,
+    maxBranchOccupancy,
+  };
+}
+
 interface InsertResult<T> {
   readonly left: TreeNode<T>;
   readonly right?: TreeNode<T>;
+}
+
+function insertValue<T>(source: readonly T[], index: number, value: T): T[] {
+  const result = new Array<T>(source.length + 1);
+
+  for (let cursor = 0; cursor < index; cursor += 1) {
+    result[cursor] = source[cursor] as T;
+  }
+
+  result[index] = value;
+
+  for (let cursor = index; cursor < source.length; cursor += 1) {
+    result[cursor + 1] = source[cursor] as T;
+  }
+
+  return result;
+}
+
+function removeValue<T>(source: readonly T[], index: number): T[] {
+  const result = new Array<T>(source.length - 1);
+
+  for (let cursor = 0; cursor < index; cursor += 1) {
+    result[cursor] = source[cursor] as T;
+  }
+
+  for (let cursor = index + 1; cursor < source.length; cursor += 1) {
+    result[cursor - 1] = source[cursor] as T;
+  }
+
+  return result;
+}
+
+function replacePair<T>(source: readonly T[], index: number, first: T, second?: T): T[] {
+  const result = new Array<T>(source.length - (second === undefined ? 1 : 0));
+
+  for (let cursor = 0; cursor < index; cursor += 1) {
+    result[cursor] = source[cursor] as T;
+  }
+
+  result[index] = first;
+  let target = index + 1;
+
+  if (second !== undefined) {
+    result[target] = second;
+    target += 1;
+  }
+
+  for (let cursor = index + 2; cursor < source.length; cursor += 1) {
+    result[target] = source[cursor] as T;
+    target += 1;
+  }
+
+  return result;
 }
 
 const DEFAULT_BRANCH_FACTOR = 32;
@@ -136,30 +251,42 @@ function leaf<T>(items: readonly T[]): LeafNode<T> {
 
 function branch<T>(children: readonly TreeNode<T>[]): BranchNode<T> {
   const sizes = new Array<number>(children.length);
+  const firstChildLength = (children[0] as TreeNode<T>).length;
+  let uniformChildLength = firstChildLength;
   let length = 0;
 
   for (let index = 0; index < children.length; index += 1) {
-    length += children[index]?.length ?? 0;
+    const childLength = (children[index] as TreeNode<T>).length;
+    length += childLength;
     sizes[index] = length;
+
+    if (childLength !== firstChildLength) {
+      uniformChildLength = 0;
+    }
   }
 
   return {
     kind: 'branch',
     children,
     sizes,
+    uniformChildLength,
     length,
-    height: (children[0]?.height ?? -1) + 1,
+    height: (children[0] as TreeNode<T>).height + 1,
   };
 }
 
 function childIndexForRead<T>(node: BranchNode<T>, index: number): number {
+  if (node.uniformChildLength > 0) {
+    return Math.floor(index / node.uniformChildLength);
+  }
+
   let low = 0;
   let high = node.sizes.length - 1;
 
   while (low < high) {
     const middle = (low + high) >>> 1;
 
-    if ((node.sizes[middle] ?? 0) > index) {
+    if ((node.sizes[middle] as number) > index) {
       high = middle;
     } else {
       low = middle + 1;
@@ -178,7 +305,13 @@ function childIndexForInsert<T>(node: BranchNode<T>, index: number): number {
 }
 
 function childStart<T>(node: BranchNode<T>, childIndex: number): number {
-  return childIndex === 0 ? 0 : (node.sizes[childIndex - 1] ?? 0);
+  if (childIndex === 0) {
+    return 0;
+  }
+
+  return node.uniformChildLength > 0
+    ? childIndex * node.uniformChildLength
+    : (node.sizes[childIndex - 1] as number);
 }
 
 function buildTree<T>(
@@ -250,9 +383,23 @@ function buildTreeFromIterable<T>(
   const previous = pages[pages.length - 2];
 
   if (last && previous && last.length < Math.ceil(pageCapacity / 2)) {
-    const combined = [...previous, ...last];
-    const midpoint = Math.ceil(combined.length / 2);
-    pages.splice(pages.length - 2, 2, combined.slice(0, midpoint), combined.slice(midpoint));
+    const totalLength = previous.length + last.length;
+    const midpoint = Math.ceil(totalLength / 2);
+    const left = previous.slice(0, midpoint);
+    const right = new Array<T>(totalLength - midpoint);
+    let target = 0;
+
+    for (let index = midpoint; index < previous.length; index += 1) {
+      right[target] = previous[index] as T;
+      target += 1;
+    }
+
+    for (let index = 0; index < last.length; index += 1) {
+      right[target] = last[index] as T;
+      target += 1;
+    }
+
+    pages.splice(pages.length - 2, 2, left, right);
   }
 
   let level: TreeNode<T>[] = pages.map((items) => leaf(items));
@@ -368,7 +515,7 @@ function lowerBound<T>(changes: readonly (readonly [number, T])[], target: numbe
   while (low < high) {
     const middle = (low + high) >>> 1;
 
-    if ((changes[middle]?.[0] ?? Number.POSITIVE_INFINITY) < target) {
+    if ((changes[middle] as readonly [number, T])[0] < target) {
       low = middle + 1;
     } else {
       high = middle;
@@ -448,19 +595,26 @@ function insertNode<T>(
   branchFactor: number,
 ): InsertResult<T> {
   if (node.kind === 'leaf') {
-    const items = node.items.slice() as T[];
-    items.splice(index, 0, value);
-
-    if (items.length <= pageCapacity) {
-      return { left: leaf(items) };
+    if (node.items.length < pageCapacity) {
+      return { left: leaf(insertValue(node.items, index, value)) };
     }
 
-    const midpoint = Math.ceil(items.length / 2);
+    const totalLength = node.items.length + 1;
+    const midpoint = Math.ceil(totalLength / 2);
+    const left = new Array<T>(midpoint);
+    const right = new Array<T>(totalLength - midpoint);
 
-    return {
-      left: leaf(items.slice(0, midpoint)),
-      right: leaf(items.slice(midpoint)),
-    };
+    for (let target = 0; target < totalLength; target += 1) {
+      const item = target === index ? value : node.items[target < index ? target : target - 1];
+
+      if (target < midpoint) {
+        left[target] = item as T;
+      } else {
+        right[target - midpoint] = item as T;
+      }
+    }
+
+    return { left: leaf(left), right: leaf(right) };
   }
 
   const selected = childIndexForInsert(node, index);
@@ -472,23 +626,33 @@ function insertNode<T>(
     pageCapacity,
     branchFactor,
   );
-  const children = node.children.slice() as TreeNode<T>[];
-  children.splice(selected, 1, childResult.left);
+  const totalLength = node.children.length + (childResult.right ? 1 : 0);
+  const midpoint = Math.ceil(totalLength / 2);
+  const left = new Array<TreeNode<T>>(totalLength <= branchFactor ? totalLength : midpoint);
+  const right =
+    totalLength <= branchFactor ? undefined : new Array<TreeNode<T>>(totalLength - midpoint);
 
-  if (childResult.right) {
-    children.splice(selected + 1, 0, childResult.right);
+  for (let target = 0; target < totalLength; target += 1) {
+    let child: TreeNode<T>;
+
+    if (target < selected) {
+      child = node.children[target] as TreeNode<T>;
+    } else if (target === selected) {
+      child = childResult.left;
+    } else if (childResult.right && target === selected + 1) {
+      child = childResult.right;
+    } else {
+      child = node.children[target - (childResult.right ? 1 : 0)] as TreeNode<T>;
+    }
+
+    if (target < left.length) {
+      left[target] = child;
+    } else {
+      (right as TreeNode<T>[])[target - midpoint] = child;
+    }
   }
 
-  if (children.length <= branchFactor) {
-    return { left: branch(children) };
-  }
-
-  const midpoint = Math.ceil(children.length / 2);
-
-  return {
-    left: branch(children.slice(0, midpoint)),
-    right: branch(children.slice(midpoint)),
-  };
+  return right ? { left: branch(left), right: branch(right) } : { left: branch(left) };
 }
 
 function combineSiblings<T>(
@@ -498,27 +662,48 @@ function combineSiblings<T>(
   branchFactor: number,
 ): readonly [TreeNode<T>, TreeNode<T>?] {
   if (left.kind === 'leaf' && right.kind === 'leaf') {
-    const combined = [...left.items, ...right.items];
+    const totalLength = left.items.length + right.items.length;
+    const midpoint = Math.ceil(totalLength / 2);
+    const first = new Array<T>(totalLength <= pageCapacity ? totalLength : midpoint);
+    const second = totalLength <= pageCapacity ? undefined : new Array<T>(totalLength - midpoint);
 
-    if (combined.length <= pageCapacity) {
-      return [leaf(combined)];
+    for (let index = 0; index < totalLength; index += 1) {
+      const value =
+        index < left.items.length
+          ? (left.items[index] as T)
+          : (right.items[index - left.items.length] as T);
+
+      if (index < first.length) {
+        first[index] = value;
+      } else {
+        (second as T[])[index - midpoint] = value;
+      }
     }
 
-    const midpoint = Math.ceil(combined.length / 2);
-
-    return [leaf(combined.slice(0, midpoint)), leaf(combined.slice(midpoint))];
+    return second ? [leaf(first), leaf(second)] : [leaf(first)];
   }
 
   if (left.kind === 'branch' && right.kind === 'branch') {
-    const combined = [...left.children, ...right.children];
+    const totalLength = left.children.length + right.children.length;
+    const midpoint = Math.ceil(totalLength / 2);
+    const first = new Array<TreeNode<T>>(totalLength <= branchFactor ? totalLength : midpoint);
+    const second =
+      totalLength <= branchFactor ? undefined : new Array<TreeNode<T>>(totalLength - midpoint);
 
-    if (combined.length <= branchFactor) {
-      return [branch(combined)];
+    for (let index = 0; index < totalLength; index += 1) {
+      const child =
+        index < left.children.length
+          ? (left.children[index] as TreeNode<T>)
+          : (right.children[index - left.children.length] as TreeNode<T>);
+
+      if (index < first.length) {
+        first[index] = child;
+      } else {
+        (second as TreeNode<T>[])[index - midpoint] = child;
+      }
     }
 
-    const midpoint = Math.ceil(combined.length / 2);
-
-    return [branch(combined.slice(0, midpoint)), branch(combined.slice(midpoint))];
+    return second ? [branch(first), branch(second)] : [branch(first)];
   }
 
   return [left, right];
@@ -529,11 +714,11 @@ function rebalanceChild<T>(
   index: number,
   pageCapacity: number,
   branchFactor: number,
-): void {
+): TreeNode<T>[] {
   const current = children[index];
 
   if (!current || children.length < 2) {
-    return;
+    return children;
   }
 
   const minimum =
@@ -541,7 +726,7 @@ function rebalanceChild<T>(
   const occupancy = current.kind === 'leaf' ? current.items.length : current.children.length;
 
   if (occupancy >= minimum) {
-    return;
+    return children;
   }
 
   const leftIndex = index > 0 ? index - 1 : index;
@@ -550,15 +735,11 @@ function rebalanceChild<T>(
   const right = children[rightIndex];
 
   if (!left || !right) {
-    return;
+    return children;
   }
 
   const [first, second] = combineSiblings(left, right, pageCapacity, branchFactor);
-  children.splice(leftIndex, 2, first);
-
-  if (second) {
-    children.splice(leftIndex + 1, 0, second);
-  }
+  return replacePair(children, leftIndex, first, second);
 }
 
 function deleteNode<T>(
@@ -569,10 +750,7 @@ function deleteNode<T>(
   rebalance: boolean,
 ): TreeNode<T> | null {
   if (node.kind === 'leaf') {
-    const items = node.items.slice() as T[];
-    items.splice(index, 1);
-
-    return items.length === 0 ? null : leaf(items);
+    return node.items.length === 1 ? null : leaf(removeValue(node.items, index));
   }
 
   const selected = childIndexForRead(node, index);
@@ -584,23 +762,57 @@ function deleteNode<T>(
     branchFactor,
     rebalance,
   );
-  const children = node.children.slice() as TreeNode<T>[];
+  const children = new Array<TreeNode<T>>(node.children.length - (updatedChild ? 0 : 1));
+  let target = 0;
 
-  if (updatedChild) {
-    children[selected] = updatedChild;
+  for (let childIndex = 0; childIndex < node.children.length; childIndex += 1) {
+    if (childIndex === selected) {
+      if (updatedChild) {
+        children[target] = updatedChild;
+        target += 1;
+      }
 
-    if (rebalance) {
-      rebalanceChild(children, selected, pageCapacity, branchFactor);
+      continue;
     }
-  } else {
-    children.splice(selected, 1);
+
+    children[target] = node.children[childIndex] as TreeNode<T>;
+    target += 1;
   }
 
   if (children.length === 0) {
     return null;
   }
 
-  return branch(children);
+  const balanced = rebalance
+    ? rebalanceChild(children, Math.min(selected, children.length - 1), pageCapacity, branchFactor)
+    : children;
+
+  return branch(balanced);
+}
+
+function forEachNode<T>(
+  node: TreeNode<T>,
+  callback: (value: T, index: number) => void,
+  offset: number,
+): void {
+  if (node.kind === 'leaf') {
+    const items = node.items;
+
+    for (let index = 0; index < items.length; index += 1) {
+      callback(items[index] as T, offset + index);
+    }
+
+    return;
+  }
+
+  let childOffset = offset;
+  const children = node.children;
+
+  for (let index = 0; index < children.length; index += 1) {
+    const child = children[index] as TreeNode<T>;
+    forEachNode(child, callback, childOffset);
+    childOffset += child.length;
+  }
 }
 
 function iterateNode<T>(root: TreeNode<T>): IterableIterator<T> {
@@ -701,14 +913,16 @@ function deleteRangeNode<T>(
     return null;
   }
 
+  let balanced = children;
+
   if (rebalance) {
     let index = 0;
 
-    while (index < children.length) {
-      const previousLength = children.length;
-      rebalanceChild(children, index, pageCapacity, branchFactor);
+    while (index < balanced.length) {
+      const previousLength = balanced.length;
+      balanced = rebalanceChild(balanced, index, pageCapacity, branchFactor);
 
-      if (children.length < previousLength) {
+      if (balanced.length < previousLength) {
         index = Math.max(0, index - 1);
       } else {
         index += 1;
@@ -716,7 +930,7 @@ function deleteRangeNode<T>(
     }
   }
 
-  return branch(children);
+  return branch(balanced);
 }
 
 function normalizeRoot<T>(node: TreeNode<T>): TreeNode<T> {
@@ -800,7 +1014,7 @@ export interface PersistentTreeVector<T> extends Iterable<T> {
   get(index: number): T | undefined;
   set(index: number, value: T): PersistentTreeVector<T>;
   setMany(
-    changes: readonly { readonly index: number; readonly value: T }[],
+    changes: readonly { readonly index: number; readonly value: T }[] | Map<number, T>,
   ): PersistentTreeVector<T>;
   insert(index: number, value: T): PersistentTreeVector<T>;
   delete(index: number): PersistentTreeVector<T>;
@@ -816,6 +1030,7 @@ export interface PersistentTreeVector<T> extends Iterable<T> {
   withProfile(profile: PageProfile): PersistentTreeVector<T>;
   snapshot(): PersistentTreeVector<T>;
   toArray(): T[];
+  forEach(callback: (value: T, index: number) => void): void;
   builder(): VectorBuilder<T>;
   transact(callback: (draft: VectorDraft<T>) => void): PersistentTreeVector<T>;
   assertValid(): void;
@@ -867,6 +1082,10 @@ export class BPlusVectorImpl<T> implements PersistentTreeVector<T> {
     assertBPlusNode(this.#root, true, this.#pageCapacity, this.#branchFactor);
   }
 
+  inspectStructure(): TreeStructureStats {
+    return inspectTree(this.#root);
+  }
+
   get length(): number {
     return this.#root.length;
   }
@@ -895,13 +1114,23 @@ export class BPlusVectorImpl<T> implements PersistentTreeVector<T> {
   }
 
   setMany(
-    changes: readonly { readonly index: number; readonly value: T }[],
+    changes: readonly { readonly index: number; readonly value: T }[] | Map<number, T>,
   ): PersistentTreeVector<T> {
-    const pending = new Map<number, T>();
+    let pending: Map<number, T>;
 
-    for (const change of changes) {
-      this.#assertIndex(change.index);
-      pending.set(change.index, change.value);
+    if (changes instanceof Map) {
+      pending = changes;
+
+      for (const index of pending.keys()) {
+        this.#assertIndex(index);
+      }
+    } else {
+      pending = new Map<number, T>();
+
+      for (const change of changes) {
+        this.#assertIndex(change.index);
+        pending.set(change.index, change.value);
+      }
     }
 
     const sorted = [...pending].sort(([left], [right]) => left - right);
@@ -978,6 +1207,10 @@ export class BPlusVectorImpl<T> implements PersistentTreeVector<T> {
 
     if (normalizedStart === 0 && normalizedEnd === this.length) {
       return this;
+    }
+
+    if (normalizedStart === normalizedEnd) {
+      return new BPlusVectorImpl(leaf([]), this.#pageCapacity, this.#branchFactor);
     }
 
     return BPlusVectorImpl.fromIterable(
@@ -1064,7 +1297,7 @@ export class BPlusVectorImpl<T> implements PersistentTreeVector<T> {
   }
 
   withProfile(profile: PageProfile): PersistentTreeVector<T> {
-    const tree = profile === PROFILE.BATCH_HEAVY ? TREE.RRB : TREE.B_PLUS;
+    const tree = profile === PROFILE.MUTATION_HEAVY ? TREE.B_PLUS : TREE.RRB;
 
     return this.convertTo(tree, { profile });
   }
@@ -1075,6 +1308,10 @@ export class BPlusVectorImpl<T> implements PersistentTreeVector<T> {
 
   toArray(): T[] {
     return [...this];
+  }
+
+  forEach(callback: (value: T, index: number) => void): void {
+    forEachNode(this.#root, callback, 0);
   }
 
   [Symbol.iterator](): IterableIterator<T> {
@@ -1187,9 +1424,7 @@ export class VectorBuilder<T> implements VectorDraft<T> {
       return;
     }
 
-    this.#current = this.#current.setMany(
-      [...this.#pending].map(([index, value]) => ({ index, value })),
-    );
+    this.#current = this.#current.setMany(this.#pending);
     this.#pending.clear();
   }
 
@@ -1225,7 +1460,7 @@ export const RRBVector = RrbVector;
 export type Vector<T> = PersistentTreeVector<T>;
 
 function automaticTree(profile: PageProfile): TreeKind {
-  return profile === PROFILE.BATCH_HEAVY ? TREE.RRB : TREE.B_PLUS;
+  return profile === PROFILE.MUTATION_HEAVY ? TREE.B_PLUS : TREE.RRB;
 }
 
 export const Vector = {

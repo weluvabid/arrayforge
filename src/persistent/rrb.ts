@@ -11,10 +11,59 @@ import {
   type RRBVector,
   type TreeKind,
   type TreeOptions,
+  type TreeStructureStats,
   type VectorDraft,
 } from './tree.ts';
 
 type RrbNode<T> = RrbLeaf<T> | RrbBranch<T>;
+
+function inspectRrb<T>(root: RrbNode<T>): TreeStructureStats {
+  const pending: RrbNode<T>[] = [root];
+  let nodes = 0;
+  let leaves = 0;
+  let branches = 0;
+  let leafItems = 0;
+  let branchChildren = 0;
+  let minLeafOccupancy = Number.POSITIVE_INFINITY;
+  let maxLeafOccupancy = 0;
+  let minBranchOccupancy = Number.POSITIVE_INFINITY;
+  let maxBranchOccupancy = 0;
+
+  while (pending.length > 0) {
+    const node = pending.pop() as RrbNode<T>;
+    nodes += 1;
+
+    if (node.tag === 0) {
+      leaves += 1;
+      leafItems += node.values.length;
+      minLeafOccupancy = Math.min(minLeafOccupancy, node.values.length);
+      maxLeafOccupancy = Math.max(maxLeafOccupancy, node.values.length);
+      continue;
+    }
+
+    branches += 1;
+    branchChildren += node.children.length;
+    minBranchOccupancy = Math.min(minBranchOccupancy, node.children.length);
+    maxBranchOccupancy = Math.max(maxBranchOccupancy, node.children.length);
+
+    for (const child of node.children) {
+      pending.push(child);
+    }
+  }
+
+  return {
+    nodes,
+    leaves,
+    branches,
+    height: root.level,
+    minLeafOccupancy: leaves === 0 ? 0 : minLeafOccupancy,
+    meanLeafOccupancy: leaves === 0 ? 0 : leafItems / leaves,
+    maxLeafOccupancy,
+    minBranchOccupancy: branches === 0 ? 0 : minBranchOccupancy,
+    meanBranchOccupancy: branches === 0 ? 0 : branchChildren / branches,
+    maxBranchOccupancy,
+  };
+}
 
 interface RrbLeaf<T> {
   readonly tag: 0;
@@ -28,6 +77,7 @@ interface RrbBranch<T> {
   readonly children: readonly RrbNode<T>[];
   /** Cumulative subtree sizes are the relaxation table used for indexed descent. */
   readonly sizes: readonly number[];
+  readonly uniformChildLength: number;
   readonly size: number;
   readonly level: number;
 }
@@ -35,6 +85,59 @@ interface RrbBranch<T> {
 interface RrbInsert<T> {
   readonly node: RrbNode<T>;
   readonly overflow?: RrbNode<T>;
+}
+
+function insertValue<T>(source: readonly T[], index: number, value: T): T[] {
+  const result = new Array<T>(source.length + 1);
+
+  for (let cursor = 0; cursor < index; cursor += 1) {
+    result[cursor] = source[cursor] as T;
+  }
+
+  result[index] = value;
+
+  for (let cursor = index; cursor < source.length; cursor += 1) {
+    result[cursor + 1] = source[cursor] as T;
+  }
+
+  return result;
+}
+
+function removeValue<T>(source: readonly T[], index: number): T[] {
+  const result = new Array<T>(source.length - 1);
+
+  for (let cursor = 0; cursor < index; cursor += 1) {
+    result[cursor] = source[cursor] as T;
+  }
+
+  for (let cursor = index + 1; cursor < source.length; cursor += 1) {
+    result[cursor - 1] = source[cursor] as T;
+  }
+
+  return result;
+}
+
+function replacePair<T>(source: readonly T[], index: number, first: T, second?: T): T[] {
+  const result = new Array<T>(source.length - (second === undefined ? 1 : 0));
+
+  for (let cursor = 0; cursor < index; cursor += 1) {
+    result[cursor] = source[cursor] as T;
+  }
+
+  result[index] = first;
+  let target = index + 1;
+
+  if (second !== undefined) {
+    result[target] = second;
+    target += 1;
+  }
+
+  for (let cursor = index + 2; cursor < source.length; cursor += 1) {
+    result[target] = source[cursor] as T;
+    target += 1;
+  }
+
+  return result;
 }
 
 const DEFAULT_BRANCH_FACTOR = 32;
@@ -57,31 +160,43 @@ function makeLeaf<T>(values: readonly T[]): RrbLeaf<T> {
 }
 
 function makeBranch<T>(children: readonly RrbNode<T>[]): RrbBranch<T> {
-  const sizes: number[] = [];
+  const sizes = new Array<number>(children.length);
+  const firstChildSize = (children[0] as RrbNode<T>).size;
+  let uniformChildLength = firstChildSize;
   let size = 0;
 
-  for (const child of children) {
-    size += child.size;
-    sizes.push(size);
+  for (let index = 0; index < children.length; index += 1) {
+    const childSize = (children[index] as RrbNode<T>).size;
+    size += childSize;
+    sizes[index] = size;
+
+    if (childSize !== firstChildSize) {
+      uniformChildLength = 0;
+    }
   }
 
   return {
     tag: 1,
     children,
     sizes,
+    uniformChildLength,
     size,
     level: (children[0]?.level ?? -1) + 1,
   };
 }
 
 function locate<T>(node: RrbBranch<T>, index: number): number {
+  if (node.uniformChildLength > 0) {
+    return Math.floor(index / node.uniformChildLength);
+  }
+
   let low = 0;
   let high = node.sizes.length;
 
   while (low < high) {
     const middle = (low + high) >>> 1;
 
-    if ((node.sizes[middle] ?? 0) <= index) {
+    if ((node.sizes[middle] as number) <= index) {
       low = middle + 1;
     } else {
       high = middle;
@@ -92,7 +207,13 @@ function locate<T>(node: RrbBranch<T>, index: number): number {
 }
 
 function prefix<T>(node: RrbBranch<T>, child: number): number {
-  return child === 0 ? 0 : (node.sizes[child - 1] ?? 0);
+  if (child === 0) {
+    return 0;
+  }
+
+  return node.uniformChildLength > 0
+    ? child * node.uniformChildLength
+    : (node.sizes[child - 1] as number);
 }
 
 function pack<T>(values: readonly T[], pageSize: number, fanout: number): RrbNode<T> {
@@ -163,52 +284,6 @@ function normalizeSliceIndex(index: number, length: number): number {
   return integer < 0 ? Math.max(length + integer, 0) : Math.min(integer, length);
 }
 
-function* sliceValues<T>(values: Iterable<T>, start: number, end: number): IterableIterator<T> {
-  let index = 0;
-
-  for (const value of values) {
-    if (index >= end) {
-      return;
-    }
-
-    if (index >= start) {
-      yield value;
-    }
-
-    index += 1;
-  }
-}
-
-function* spliceValues<T>(
-  values: Iterable<T>,
-  start: number,
-  end: number,
-  inserted: readonly T[],
-): IterableIterator<T> {
-  let index = 0;
-
-  for (const value of values) {
-    if (index === start) {
-      yield* inserted;
-    }
-
-    if (index < start || index >= end) {
-      yield value;
-    }
-
-    index += 1;
-  }
-
-  if (start === index) {
-    yield* inserted;
-  }
-}
-
-function* concatValues<T>(values: Iterable<T>, other: Iterable<T>): IterableIterator<T> {
-  yield* values;
-  yield* other;
-}
-
 function read<T>(root: RrbNode<T>, index: number): T | undefined {
   let node = root;
   let cursor = index;
@@ -253,7 +328,7 @@ function lowerBound<T>(updates: readonly (readonly [number, T])[], target: numbe
   while (low < high) {
     const middle = (low + high) >>> 1;
 
-    if ((updates[middle]?.[0] ?? Number.POSITIVE_INFINITY) < target) {
+    if ((updates[middle] as readonly [number, T])[0] < target) {
       low = middle + 1;
     } else {
       high = middle;
@@ -333,64 +408,199 @@ function insert<T>(
   fanout: number,
 ): RrbInsert<T> {
   if (node.tag === 0) {
-    const values = node.values.slice() as T[];
-    values.splice(index, 0, value);
-
-    if (values.length <= pageSize) {
-      return { node: makeLeaf(values) };
+    if (node.values.length < pageSize) {
+      return { node: makeLeaf(insertValue(node.values, index, value)) };
     }
 
-    const midpoint = Math.ceil(values.length / 2);
-    return {
-      node: makeLeaf(values.slice(0, midpoint)),
-      overflow: makeLeaf(values.slice(midpoint)),
-    };
+    const totalLength = node.values.length + 1;
+    const midpoint = Math.ceil(totalLength / 2);
+    const left = new Array<T>(midpoint);
+    const right = new Array<T>(totalLength - midpoint);
+
+    for (let target = 0; target < totalLength; target += 1) {
+      const item = target === index ? value : node.values[target < index ? target : target - 1];
+
+      if (target < midpoint) {
+        left[target] = item as T;
+      } else {
+        right[target - midpoint] = item as T;
+      }
+    }
+
+    return { node: makeLeaf(left), overflow: makeLeaf(right) };
   }
 
   const childIndex = index === node.size ? node.children.length - 1 : locate(node, index);
   const child = node.children[childIndex] as RrbNode<T>;
   const localIndex = index - prefix(node, childIndex);
   const result = insert(child, localIndex, value, pageSize, fanout);
-  const children = node.children.slice() as RrbNode<T>[];
-  children.splice(childIndex, 1, result.node);
+  const totalLength = node.children.length + (result.overflow ? 1 : 0);
+  const midpoint = Math.ceil(totalLength / 2);
+  const left = new Array<RrbNode<T>>(totalLength <= fanout ? totalLength : midpoint);
+  const right = totalLength <= fanout ? undefined : new Array<RrbNode<T>>(totalLength - midpoint);
 
-  if (result.overflow) {
-    children.splice(childIndex + 1, 0, result.overflow);
+  for (let target = 0; target < totalLength; target += 1) {
+    let next: RrbNode<T>;
+
+    if (target < childIndex) {
+      next = node.children[target] as RrbNode<T>;
+    } else if (target === childIndex) {
+      next = result.node;
+    } else if (result.overflow && target === childIndex + 1) {
+      next = result.overflow;
+    } else {
+      next = node.children[target - (result.overflow ? 1 : 0)] as RrbNode<T>;
+    }
+
+    if (target < left.length) {
+      left[target] = next;
+    } else {
+      (right as RrbNode<T>[])[target - midpoint] = next;
+    }
   }
 
-  if (children.length <= fanout) {
-    return { node: makeBranch(children) };
-  }
-
-  const midpoint = Math.ceil(children.length / 2);
-  return {
-    node: makeBranch(children.slice(0, midpoint)),
-    overflow: makeBranch(children.slice(midpoint)),
-  };
+  return right
+    ? { node: makeBranch(left), overflow: makeBranch(right) }
+    : { node: makeBranch(left) };
 }
 
-function remove<T>(node: RrbNode<T>, index: number): RrbNode<T> | null {
+function rebalanceChildren<T>(
+  children: RrbNode<T>[],
+  index: number,
+  pageSize: number,
+  fanout: number,
+): RrbNode<T>[] {
+  const current = children[index];
+
+  if (!current || children.length < 2) {
+    return children;
+  }
+
+  const minimum = current.tag === 0 ? Math.ceil(pageSize / 2) : Math.ceil(fanout / 2);
+  const occupancy = current.tag === 0 ? current.values.length : current.children.length;
+
+  if (occupancy >= minimum) {
+    return children;
+  }
+
+  const leftIndex = index > 0 ? index - 1 : index;
+  const left = children[leftIndex];
+  const right = children[leftIndex + 1];
+
+  if (!left || !right || left.tag !== right.tag || left.level !== right.level) {
+    return children;
+  }
+
+  if (left.tag === 0 && right.tag === 0) {
+    const total = left.values.length + right.values.length;
+    const combined = new Array<T>(total);
+    let offset = 0;
+
+    for (const value of left.values) {
+      combined[offset] = value;
+      offset += 1;
+    }
+
+    for (const value of right.values) {
+      combined[offset] = value;
+      offset += 1;
+    }
+
+    if (total <= pageSize) {
+      return replacePair(children, leftIndex, makeLeaf(combined));
+    }
+
+    const midpoint = Math.ceil(total / 2);
+    return replacePair(
+      children,
+      leftIndex,
+      makeLeaf(combined.slice(0, midpoint)),
+      makeLeaf(combined.slice(midpoint)),
+    );
+  }
+
+  if (left.tag === 1 && right.tag === 1) {
+    const total = left.children.length + right.children.length;
+    const combined = new Array<RrbNode<T>>(total);
+    let offset = 0;
+
+    for (const child of left.children) {
+      combined[offset] = child;
+      offset += 1;
+    }
+
+    for (const child of right.children) {
+      combined[offset] = child;
+      offset += 1;
+    }
+
+    if (total <= fanout) {
+      return replacePair(children, leftIndex, makeBranch(combined));
+    }
+
+    const midpoint = Math.ceil(total / 2);
+    return replacePair(
+      children,
+      leftIndex,
+      makeBranch(combined.slice(0, midpoint)),
+      makeBranch(combined.slice(midpoint)),
+    );
+  }
+
+  return children;
+}
+
+function remove<T>(
+  node: RrbNode<T>,
+  index: number,
+  pageSize: number,
+  fanout: number,
+): RrbNode<T> | null {
   if (node.tag === 0) {
-    const values = node.values.slice() as T[];
-    values.splice(index, 1);
-    return values.length === 0 ? null : makeLeaf(values);
+    return node.values.length === 1 ? null : makeLeaf(removeValue(node.values, index));
   }
 
   const childIndex = locate(node, index);
   const child = node.children[childIndex] as RrbNode<T>;
-  const next = remove(child, index - prefix(node, childIndex));
-  const children = node.children.slice() as RrbNode<T>[];
+  const next = remove(child, index - prefix(node, childIndex), pageSize, fanout);
+  const children = new Array<RrbNode<T>>(node.children.length - (next ? 0 : 1));
+  let target = 0;
 
-  if (next) {
-    children[childIndex] = next;
-  } else {
-    children.splice(childIndex, 1);
+  for (let childIndexCursor = 0; childIndexCursor < node.children.length; childIndexCursor += 1) {
+    if (childIndexCursor === childIndex) {
+      if (next) {
+        children[target] = next;
+        target += 1;
+      }
+
+      continue;
+    }
+
+    children[target] = node.children[childIndexCursor] as RrbNode<T>;
+    target += 1;
   }
 
-  return children.length === 0 ? null : makeBranch(children);
+  if (children.length === 0) {
+    return null;
+  }
+
+  const balanced = rebalanceChildren(
+    children,
+    Math.min(childIndex, children.length - 1),
+    pageSize,
+    fanout,
+  );
+
+  return makeBranch(balanced);
 }
 
-function removeRange<T>(node: RrbNode<T>, start: number, end: number): RrbNode<T> | null {
+function removeRange<T>(
+  node: RrbNode<T>,
+  start: number,
+  end: number,
+  pageSize: number,
+  fanout: number,
+): RrbNode<T> | null {
   if (start === 0 && end >= node.size) {
     return null;
   }
@@ -415,6 +625,8 @@ function removeRange<T>(node: RrbNode<T>, start: number, end: number): RrbNode<T
         child,
         Math.max(0, start - offset),
         Math.min(child.size, end - offset),
+        pageSize,
+        fanout,
       );
 
       if (next) {
@@ -425,7 +637,25 @@ function removeRange<T>(node: RrbNode<T>, start: number, end: number): RrbNode<T
     offset = childEnd;
   }
 
-  return retained.length === 0 ? null : makeBranch(retained);
+  if (retained.length === 0) {
+    return null;
+  }
+
+  let balanced = retained;
+  let index = 0;
+
+  while (index < balanced.length) {
+    const previousLength = balanced.length;
+    balanced = rebalanceChildren(balanced, index, pageSize, fanout);
+
+    if (balanced.length < previousLength) {
+      index = Math.max(0, index - 1);
+    } else {
+      index += 1;
+    }
+  }
+
+  return makeBranch(balanced);
 }
 
 function collapse<T>(node: RrbNode<T>): RrbNode<T> {
@@ -436,6 +666,217 @@ function collapse<T>(node: RrbNode<T>): RrbNode<T> {
   }
 
   return root;
+}
+
+function sliceNode<T>(node: RrbNode<T>, start: number, end: number): RrbNode<T> | null {
+  if (start <= 0 && end >= node.size) {
+    return node;
+  }
+
+  if (start >= end) {
+    return null;
+  }
+
+  if (node.tag === 0) {
+    const values = node.values.slice(Math.max(0, start), Math.min(node.size, end));
+
+    return values.length === 0 ? null : makeLeaf(values);
+  }
+
+  const children: RrbNode<T>[] = [];
+  let offset = 0;
+
+  for (const child of node.children) {
+    const childEnd = offset + child.size;
+
+    if (childEnd > start && offset < end) {
+      if (start <= offset && end >= childEnd) {
+        children.push(child);
+      } else {
+        const updated = sliceNode(
+          child,
+          Math.max(0, start - offset),
+          Math.min(child.size, end - offset),
+        );
+
+        if (updated) {
+          children.push(updated);
+        }
+      }
+    }
+
+    offset = childEnd;
+  }
+
+  return children.length === 0 ? null : makeBranch(children);
+}
+
+function packBranches<T>(children: RrbNode<T>[], fanout: number): RrbInsert<T> {
+  if (children.length <= fanout) {
+    return { node: makeBranch(children) };
+  }
+
+  const midpoint = Math.ceil(children.length / 2);
+
+  return {
+    node: makeBranch(children.slice(0, midpoint)),
+    overflow: makeBranch(children.slice(midpoint)),
+  };
+}
+
+function joinNodes<T>(
+  left: RrbNode<T>,
+  right: RrbNode<T>,
+  pageSize: number,
+  fanout: number,
+): RrbInsert<T> {
+  if (left.level === 0 && right.level === 0) {
+    const leftValues = (left as RrbLeaf<T>).values;
+    const rightValues = (right as RrbLeaf<T>).values;
+    const length = leftValues.length + rightValues.length;
+    const midpoint = Math.ceil(length / 2);
+
+    if (length <= pageSize) {
+      const values = new Array<T>(length);
+
+      for (let index = 0; index < leftValues.length; index += 1) {
+        values[index] = leftValues[index] as T;
+      }
+
+      for (let index = 0; index < rightValues.length; index += 1) {
+        values[leftValues.length + index] = rightValues[index] as T;
+      }
+
+      return { node: makeLeaf(values) };
+    }
+
+    const first = new Array<T>(midpoint);
+    const second = new Array<T>(length - midpoint);
+
+    for (let index = 0; index < midpoint; index += 1) {
+      first[index] =
+        index < leftValues.length
+          ? (leftValues[index] as T)
+          : (rightValues[index - leftValues.length] as T);
+    }
+
+    for (let index = midpoint; index < length; index += 1) {
+      const target = index - midpoint;
+      second[target] =
+        index < leftValues.length
+          ? (leftValues[index] as T)
+          : (rightValues[index - leftValues.length] as T);
+    }
+
+    return { node: makeLeaf(first), overflow: makeLeaf(second) };
+  }
+
+  if (left.level === right.level) {
+    const leftBranch = left as RrbBranch<T>;
+    const rightBranch = right as RrbBranch<T>;
+    const childJoin = joinNodes(
+      leftBranch.children[leftBranch.children.length - 1] as RrbNode<T>,
+      rightBranch.children[0] as RrbNode<T>,
+      pageSize,
+      fanout,
+    );
+    const childJoinCount = childJoin.overflow ? 2 : 1;
+    const children = new Array<RrbNode<T>>(
+      leftBranch.children.length - 1 + childJoinCount + rightBranch.children.length - 1,
+    );
+    let target = 0;
+
+    for (let index = 0; index < leftBranch.children.length - 1; index += 1) {
+      children[target] = leftBranch.children[index] as RrbNode<T>;
+      target += 1;
+    }
+
+    children[target] = childJoin.node;
+    target += 1;
+
+    if (childJoin.overflow) {
+      children[target] = childJoin.overflow;
+      target += 1;
+    }
+
+    for (let index = 1; index < rightBranch.children.length; index += 1) {
+      children[target] = rightBranch.children[index] as RrbNode<T>;
+      target += 1;
+    }
+
+    return packBranches(children, fanout);
+  }
+
+  if (left.level > right.level) {
+    const leftBranch = left as RrbBranch<T>;
+    const lastIndex = leftBranch.children.length - 1;
+    const childJoin = joinNodes(
+      leftBranch.children[lastIndex] as RrbNode<T>,
+      right,
+      pageSize,
+      fanout,
+    );
+    const childJoinCount = childJoin.overflow ? 2 : 1;
+    const children = new Array<RrbNode<T>>(lastIndex + childJoinCount);
+
+    for (let index = 0; index < lastIndex; index += 1) {
+      children[index] = leftBranch.children[index] as RrbNode<T>;
+    }
+
+    children[lastIndex] = childJoin.node;
+
+    if (childJoin.overflow) {
+      children[lastIndex + 1] = childJoin.overflow;
+    }
+
+    return packBranches(children, fanout);
+  }
+
+  const rightBranch = right as RrbBranch<T>;
+  const childJoin = joinNodes(left, rightBranch.children[0] as RrbNode<T>, pageSize, fanout);
+  const childJoinCount = childJoin.overflow ? 2 : 1;
+  const children = new Array<RrbNode<T>>(childJoinCount + rightBranch.children.length - 1);
+  let target = 0;
+
+  children[target] = childJoin.node;
+  target += 1;
+
+  if (childJoin.overflow) {
+    children[target] = childJoin.overflow;
+    target += 1;
+  }
+
+  for (let index = 1; index < rightBranch.children.length; index += 1) {
+    children[target] = rightBranch.children[index] as RrbNode<T>;
+    target += 1;
+  }
+
+  return packBranches(children, fanout);
+}
+
+function forEachNode<T>(
+  node: RrbNode<T>,
+  callback: (value: T, index: number) => void,
+  offset: number,
+): void {
+  if (node.tag === 0) {
+    const values = node.values;
+
+    for (let index = 0; index < values.length; index += 1) {
+      callback(values[index] as T, offset + index);
+    }
+
+    return;
+  }
+
+  let childOffset = offset;
+  const children = node.children;
+
+  for (let index = 0; index < children.length; index += 1) {
+    const child = children[index] as RrbNode<T>;
+    forEachNode(child, callback, childOffset);
+    childOffset += child.size;
+  }
 }
 
 function walk<T>(root: RrbNode<T>): IterableIterator<T> {
@@ -572,6 +1013,10 @@ export class RrbVectorImpl<T> implements PersistentTreeVector<T> {
     assertRrbNode(this.#root, true, this.#pageSize, this.#fanout);
   }
 
+  inspectStructure(): TreeStructureStats {
+    return inspectRrb(this.#root);
+  }
+
   get length(): number {
     return this.#root.size;
   }
@@ -598,13 +1043,23 @@ export class RrbVectorImpl<T> implements PersistentTreeVector<T> {
   }
 
   setMany(
-    changes: readonly { readonly index: number; readonly value: T }[],
+    changes: readonly { readonly index: number; readonly value: T }[] | Map<number, T>,
   ): PersistentTreeVector<T> {
-    const updates = new Map<number, T>();
+    let updates: Map<number, T>;
 
-    for (const change of changes) {
-      this.#checkIndex(change.index);
-      updates.set(change.index, change.value);
+    if (changes instanceof Map) {
+      updates = changes;
+
+      for (const index of updates.keys()) {
+        this.#checkIndex(index);
+      }
+    } else {
+      updates = new Map<number, T>();
+
+      for (const change of changes) {
+        this.#checkIndex(change.index);
+        updates.set(change.index, change.value);
+      }
     }
 
     const sorted = [...updates].sort(([left], [right]) => left - right);
@@ -649,7 +1104,7 @@ export class RrbVectorImpl<T> implements PersistentTreeVector<T> {
 
   delete(index: number): PersistentTreeVector<T> {
     this.#checkIndex(index);
-    const root = collapse(remove(this.#root, index) ?? makeLeaf([]));
+    const root = collapse(remove(this.#root, index, this.#pageSize, this.#fanout) ?? makeLeaf([]));
 
     return new RrbVectorImpl(root, this.#pageSize, this.#fanout);
   }
@@ -661,7 +1116,9 @@ export class RrbVectorImpl<T> implements PersistentTreeVector<T> {
       return this;
     }
 
-    const root = collapse(removeRange(this.#root, start, end) ?? makeLeaf([]));
+    const root = collapse(
+      removeRange(this.#root, start, end, this.#pageSize, this.#fanout) ?? makeLeaf([]),
+    );
 
     return new RrbVectorImpl(root, this.#pageSize, this.#fanout);
   }
@@ -674,11 +1131,13 @@ export class RrbVectorImpl<T> implements PersistentTreeVector<T> {
       return this;
     }
 
-    return RrbVectorImpl.fromIterable(
-      sliceValues(this, normalizedStart, normalizedEnd),
-      { pageSize: this.#pageSize, branchFactor: this.#fanout },
-      normalizedEnd - normalizedStart,
-    );
+    if (normalizedStart === normalizedEnd) {
+      return new RrbVectorImpl(makeLeaf([]), this.#pageSize, this.#fanout);
+    }
+
+    const root = collapse(sliceNode(this.#root, normalizedStart, normalizedEnd) ?? makeLeaf([]));
+
+    return new RrbVectorImpl(root, this.#pageSize, this.#fanout);
   }
 
   splice(start: number, deleteCount: number, ...items: T[]): PersistentTreeVector<T> {
@@ -692,22 +1151,37 @@ export class RrbVectorImpl<T> implements PersistentTreeVector<T> {
       return this;
     }
 
-    return RrbVectorImpl.fromIterable(
-      spliceValues(this, normalizedStart, end, items),
-      { pageSize: this.#pageSize, branchFactor: this.#fanout },
-      this.length - normalizedDeleteCount + items.length,
-    );
+    const prefix = this.slice(0, normalizedStart);
+    const suffix = this.slice(end, this.length);
+    const withInserted = items.length === 0 ? prefix : prefix.concat(items);
+
+    return withInserted.concat(suffix);
   }
 
   concat(other: Iterable<T>): PersistentTreeVector<T> {
-    const candidateLength = (other as unknown as { length?: unknown }).length;
-    const otherLength = typeof candidateLength === 'number' ? candidateLength : undefined;
+    const right =
+      other instanceof RrbVectorImpl &&
+      other.#pageSize === this.#pageSize &&
+      other.#fanout === this.#fanout
+        ? other
+        : RrbVectorImpl.fromIterable(
+            other,
+            { pageSize: this.#pageSize, branchFactor: this.#fanout },
+            0,
+          );
 
-    return RrbVectorImpl.fromIterable(
-      concatValues(this, other),
-      { pageSize: this.#pageSize, branchFactor: this.#fanout },
-      otherLength === undefined ? 0 : this.length + otherLength,
-    );
+    if (right.length === 0) {
+      return this;
+    }
+
+    if (this.length === 0) {
+      return new RrbVectorImpl(right.#root, this.#pageSize, this.#fanout);
+    }
+
+    const joined = joinNodes(this.#root, right.#root, this.#pageSize, this.#fanout);
+    const root = joined.overflow ? makeBranch([joined.node, joined.overflow]) : joined.node;
+
+    return new RrbVectorImpl(collapse(root), this.#pageSize, this.#fanout);
   }
 
   convertTo(tree: typeof TREE.B_PLUS, options?: TreeOptions): BPlusVector<T>;
@@ -759,7 +1233,7 @@ export class RrbVectorImpl<T> implements PersistentTreeVector<T> {
   }
 
   withProfile(profile: PageProfile): PersistentTreeVector<T> {
-    const tree = profile === PROFILE.BATCH_HEAVY ? TREE.RRB : TREE.B_PLUS;
+    const tree = profile === PROFILE.MUTATION_HEAVY ? TREE.B_PLUS : TREE.RRB;
 
     return this.convertTo(tree, { profile });
   }
@@ -770,6 +1244,10 @@ export class RrbVectorImpl<T> implements PersistentTreeVector<T> {
 
   toArray(): T[] {
     return [...this];
+  }
+
+  forEach(callback: (value: T, index: number) => void): void {
+    forEachNode(this.#root, callback, 0);
   }
 
   [Symbol.iterator](): IterableIterator<T> {

@@ -6,7 +6,7 @@ import {
   mutativeBrowserAdapter,
 } from './adapters.ts';
 import { createValues } from '../../src/benchmark/random.ts';
-import { defaultIterations, runWorkload } from '../../src/benchmark/workloads.ts';
+import { defaultIterations, prepareWorkload, runWorkload } from '../../src/benchmark/workloads.ts';
 import type {
   BenchmarkOptions,
   BenchmarkResult,
@@ -59,21 +59,38 @@ function runAdapter(
   const samples: number[] = [];
   const heapDeltas: number[] = [];
   let checksum = 0;
+  let structure: BenchmarkResult['structure'] = null;
 
   for (let warmup = 0; warmup < options.warmup; warmup += 1) {
-    runWorkload(adapter, workload, adapter.create(values), options, iterations);
+    const prepared = prepareWorkload(workload, options);
+    runWorkload(adapter, workload, adapter.create(values), options, iterations, prepared);
   }
 
   for (let round = 0; round < options.rounds; round += 1) {
+    const prepared = prepareWorkload(workload, options);
     const before = heapUsed();
-    const collection = adapter.create(values);
-    const startedAt = performance.now();
-    const run = runWorkload(adapter, workload, collection, options, iterations);
-    const elapsed = Math.max(performance.now() - startedAt, 0.000_001);
+    let collection: unknown;
+    let run: ReturnType<typeof runWorkload>;
+    let elapsed: number;
+
+    if (workload === 'construction') {
+      const startedAt = performance.now();
+      collection = adapter.create(values);
+      elapsed = Math.max(performance.now() - startedAt, 0.000_001);
+      run = runWorkload(adapter, workload, collection, options, iterations, prepared);
+    } else {
+      collection = adapter.create(values);
+      const startedAt = performance.now();
+      run = runWorkload(adapter, workload, collection, options, iterations, prepared);
+      elapsed = Math.max(performance.now() - startedAt, 0.000_001);
+    }
+
+    structure = adapter.inspect?.(run.collection) ?? null;
     const after = heapUsed();
 
     samples.push(elapsed / iterations);
-    checksum += run.checksum + adapter.length(run.collection);
+    checksum +=
+      workload === 'construction' ? run.checksum : run.checksum + adapter.length(run.collection);
 
     if (before !== null && after !== null) {
       heapDeltas.push(after - before);
@@ -106,6 +123,7 @@ function runAdapter(
       rss: null,
     },
     checksum,
+    structure,
   };
 }
 

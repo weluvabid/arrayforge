@@ -39,5 +39,6 @@ export async function loadImmerAdapter(): Promise<CollectionAdapter> {
       }),
     snapshot: (collection) => collection,
     iterate: (collection) => collection as number[],
+    forEach: (collection, callback) => (collection as number[]).forEach(callback),
   };
 }

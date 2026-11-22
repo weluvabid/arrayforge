@@ -131,9 +131,11 @@ await test('adaptive page capacity follows the selected workload profile', () =>
   assert.equal(selectPageCapacity(1_000_000, PROFILE.BATCH_HEAVY), PAGE_SIZE.SMALL);
   assert.equal(selectPageCapacity(999_999, PROFILE.READ_HEAVY), PAGE_SIZE.MEDIUM);
   assert.equal(selectPageCapacity(1_000_000, PROFILE.READ_HEAVY), PAGE_SIZE.LARGE);
-  assert.equal(Vector.from([1, 2, 3]).kind, 'bplus');
+  assert.equal(Vector.from([1, 2, 3]).kind, 'rrb');
   assert.equal(Vector.from([1, 2, 3]).pageSize, PAGE_SIZE.SMALL);
   assert.equal(Vector.from([1, 2, 3], { profile: PROFILE.BATCH_HEAVY }).kind, 'rrb');
+  assert.equal(Vector.from([1, 2, 3], { profile: PROFILE.READ_HEAVY }).kind, 'rrb');
+  assert.equal(Vector.from([1, 2, 3], { profile: PROFILE.MUTATION_HEAVY }).kind, 'bplus');
 });
 
 for (const [name, createVector] of factories) {
@@ -166,6 +168,23 @@ await test('benchmark registry exposes all tree and page-capacity candidates', a
 });
 
 for (const [name, createVector] of factories) {
+  await test(`${name} forEach visits every value once with its absolute index`, () => {
+    const vector = createVector(
+      Array.from({ length: 2_501 }, (_, index) => index * 3),
+      64,
+    );
+    const visited: number[] = [];
+    let indexSum = 0;
+
+    vector.forEach((value, index) => {
+      visited.push(value);
+      indexSum += index;
+    });
+
+    assert.deepEqual(visited, vector.toArray());
+    assert.equal(indexSum, (vector.length * (vector.length - 1)) / 2);
+  });
+
   await test(`${name} iterators are independent and support early termination`, () => {
     const vector = createVector([10, 20, 30, 40, 50], 4);
     const first = vector[Symbol.iterator]();
@@ -202,6 +221,20 @@ for (const [name, createVector] of factories) {
     assert.equal(committed.get(2), -2);
     assert.equal(committed.get(10), 10_001);
     assert.equal(committed.length, 2_000);
+  });
+
+  await test(`${name} setMany accepts a pre-deduplicated Map`, () => {
+    const original = createVector([0, 1, 2, 3, 4], 8);
+    const updated = original.setMany(
+      new Map<number, number>([
+        [1, 10],
+        [3, 30],
+      ]),
+    );
+
+    assert.deepEqual([...original], [0, 1, 2, 3, 4]);
+    assert.deepEqual([...updated], [0, 10, 2, 30, 4]);
+    updated.assertValid();
   });
 
   await test(`${name} setMany reuses unchanged versions and validates structure`, () => {
@@ -296,6 +329,28 @@ for (const [name, factory] of [
 }
 
 for (const [name, createVector] of factories) {
+  await test(`${name} slices retain structural invariants across page boundaries`, () => {
+    for (const length of [0, 1, 7, 8, 9, 15, 16, 17, 63, 64, 65, 257, 1_003, 10_001]) {
+      const values = Array.from({ length }, (_, index) => index);
+      const original = createVector(values, 8);
+      const ranges = [
+        [0, length],
+        [0, Math.floor(length / 2)],
+        [Math.floor(length / 2), length],
+        [1, Math.max(1, length - 1)],
+        [Math.floor(length / 4), Math.floor((length * 3) / 4)],
+        [length, length],
+      ] as const;
+
+      for (const [start, end] of ranges) {
+        const sliced = original.slice(start, end);
+
+        assert.deepEqual(sliced.toArray(), values.slice(start, end));
+        sliced.assertValid();
+      }
+    }
+  });
+
   await test(`${name} supports immutable slice, splice and concat`, () => {
     const original = createVector([0, 1, 2, 3, 4, 5], 4);
     const sliced = original.slice(1, -1);
@@ -336,6 +391,38 @@ for (const [name, createVector] of factories) {
   });
 }
 
+await test('RRB structural joins handle different tree heights and preserve inputs', () => {
+  const lengths = [0, 1, 7, 8, 9, 31, 32, 33, 257, 1_025, 10_001];
+
+  for (const leftLength of lengths) {
+    for (const rightLength of lengths) {
+      const leftValues = Array.from({ length: leftLength }, (_, index) => index);
+      const rightValues = Array.from({ length: rightLength }, (_, index) => leftLength + index);
+      const left = RRBVector.from(leftValues, { pageSize: 8, branchFactor: 4 });
+      const right = RRBVector.from(rightValues, { pageSize: 8, branchFactor: 4 });
+      const joined = left.concat(right);
+
+      assert.deepEqual(joined.toArray(), [...leftValues, ...rightValues]);
+      joined.assertValid();
+      left.assertValid();
+      right.assertValid();
+    }
+  }
+});
+
+await test('RRB splice composes structural slices and joins', () => {
+  const values = Array.from({ length: 10_001 }, (_, index) => index);
+  const original = RRBVector.from(values, { pageSize: 8, branchFactor: 4 });
+  const expected = values.slice();
+  expected.splice(1_237, 4_321, -1, -2, -3, -4);
+  const spliced = original.splice(1_237, 4_321, -1, -2, -3, -4);
+
+  assert.deepEqual(spliced.toArray(), expected);
+  spliced.assertValid();
+  assert.deepEqual(original.toArray(), values);
+  original.assertValid();
+});
+
 await test('Vector factory honours explicit tree selection and workload profiles', () => {
   assert.equal(Object.isFrozen(PROFILE), true);
   assert.equal(Object.isFrozen(TREE), true);
@@ -343,6 +430,10 @@ await test('Vector factory honours explicit tree selection and workload profiles
   assert.equal(Vector.from([1, 2], { tree: TREE.B_PLUS }).kind, 'bplus');
   assert.equal(Vector.from([1, 2], { tree: TREE.RRB }).kind, 'rrb');
   assert.equal(Vector.from([1, 2], { tree: TREE.AUTO, profile: PROFILE.BATCH_HEAVY }).kind, 'rrb');
+  assert.equal(
+    Vector.from([1, 2], { tree: TREE.AUTO, profile: PROFILE.MUTATION_HEAVY }).kind,
+    'bplus',
+  );
   assert.equal(Vector.from([1, 2], { tree: TREE.RRB, profile: PROFILE.BALANCED }).kind, 'rrb');
   assert.equal(
     Vector.from([1, 2], { tree: TREE.B_PLUS, profile: PROFILE.BATCH_HEAVY }).kind,
@@ -358,12 +449,15 @@ await test('profile changes rebuild for the requested workload and preserve the 
   const original = Vector.from([1, 2, 3, 4]);
   const batch = original.withProfile(PROFILE.BATCH_HEAVY);
   const read = batch.withProfile(PROFILE.READ_HEAVY);
+  const mutation = read.withProfile(PROFILE.MUTATION_HEAVY);
 
-  assert.equal(original.kind, 'bplus');
+  assert.equal(original.kind, 'rrb');
   assert.equal(batch.kind, 'rrb');
-  assert.equal(read.kind, 'bplus');
+  assert.equal(read.kind, 'rrb');
+  assert.equal(mutation.kind, 'bplus');
   assert.deepEqual(batch.toArray(), original.toArray());
   assert.deepEqual(read.toArray(), original.toArray());
+  assert.deepEqual(mutation.toArray(), original.toArray());
 });
 
 await test('persistent tree adapters apply batch writes through the collection API', async () => {
@@ -389,6 +483,17 @@ await test('persistent tree adapters apply batch writes through the collection A
   }
 });
 
+await test('B+ iterable construction balances an underfull final page', () => {
+  for (const length of [1, 7, 8, 9, 15, 16, 17, 23, 24, 25, 65]) {
+    const values = Array.from({ length }, (_, index) => index);
+    const source = RRBVector.from(values, { pageSize: 8, branchFactor: 4 });
+    const converted = source.toBPlus({ pageSize: 8, branchFactor: 4 });
+
+    assert.deepEqual(converted.toArray(), values);
+    converted.assertValid();
+  }
+});
+
 await test('dedicated constructors and conversion methods retain concrete tree types', () => {
   const bplus: BPlusVectorType<number> = BPlusVector.from([1, 2, 3]);
   const rrb: RRBVectorType<number> = bplus.toRRB();
@@ -400,3 +505,35 @@ await test('dedicated constructors and conversion methods retain concrete tree t
   assert.equal(convertedByFactory.kind, TREE.RRB);
   assert.equal(convertedBack.kind, TREE.B_PLUS);
 });
+
+for (const [name, create] of [
+  ['B+ tree', (values: number[]) => BPlusVector.from(values, { pageSize: 64 })],
+  ['RRB tree', (values: number[]) => RrbVector.from(values, { pageSize: 64 })],
+] as const) {
+  await test(`${name} maintains healthy occupancy through random mutation churn`, () => {
+    const values = Array.from({ length: 20_000 }, (_, index) => index);
+    const original = create(values);
+    let vector = original;
+    let state = 0x9e3779b9;
+
+    for (let iteration = 0; iteration < 5_000; iteration += 1) {
+      state = (Math.imul(state ^ (state >>> 16), 0x21f0aaad) + 0x735a2d97) >>> 0;
+      const deleteIndex = state % vector.length;
+      vector = vector.delete(deleteIndex);
+      state = (Math.imul(state ^ (state >>> 15), 0x735a2d97) + 0x9e3779b9) >>> 0;
+      const insertIndex = state % (vector.length + 1);
+      vector = vector.insert(insertIndex, 20_000 + iteration);
+    }
+
+    vector.assertValid();
+    assert.equal(vector.length, values.length);
+    assert.equal(original.get(0), 0);
+    const stats = (
+      vector as typeof vector & {
+        inspectStructure(): { minLeafOccupancy: number; maxLeafOccupancy: number };
+      }
+    ).inspectStructure();
+    assert.ok(stats.minLeafOccupancy >= 32);
+    assert.ok(stats.maxLeafOccupancy <= 64);
+  });
+}

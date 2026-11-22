@@ -1,110 +1,81 @@
 # ArrayForge architecture specification
 
 **Version:** 0.1.0  
-**Status:** Foundational decisions frozen
+**Status:** Initial vector implementation
 
 ## Purpose
 
-ArrayForge is a persistent collection engine for JavaScript and TypeScript. It is designed for large browser-resident datasets that need frequent updates, snapshots and history.
+ArrayForge is a persistent collection library for JavaScript and TypeScript. It targets datasets where an application needs to retain earlier collection versions while applying indexed and sequence updates.
 
-A collection version points to an immutable root. An update creates new pages and tree paths where needed, then reuses the rest of the existing structure.
+A vector points to an immutable root. An update creates new pages and tree nodes along the affected path, then reuses the unchanged structure.
 
-## System layers
+## Implemented system
 
-1. **Public API** — vectors, numeric collections, snapshots, sequence operations and transactions.
-2. **Persistent tree** — indexed navigation, subtree sizes, structural sharing and rebalancing.
-3. **Storage backends** — reference pages, typed numeric pages and packed metadata.
-4. **Transaction engine** — page ownership, copy-on-write, commit and rollback.
-5. **Runtime support** — iteration, memory measurements and browser integration.
+The current package consists of:
 
-The public collection interfaces stay independent of the tree and page implementations.
+1. **Public vector API** — indexed reads and writes, insertion, deletion, range deletion, slicing, splicing, concatenation, conversion, snapshots, iteration and transactions.
+2. **B+ tree engine** — balanced leaf and branch occupancy, subtree sizes and path copying.
+3. **RRB tree engine** — relaxed subtree sizes, cumulative size tables and path copying.
+4. **Transaction builder** — pending indexed writes, ordered structural operations, commit and rollback.
+5. **Benchmark tooling** — deterministic workloads, Node measurements, V8 allocation sampling and a browser benchmark page.
+
+B+ and RRB have separate node types and algorithms. They implement the same `PersistentTreeVector<T>` contract.
 
 ## Tree selection
 
-ArrayForge evaluates two persistent sequence structures:
+`Vector.from()` defaults to RRB. The mutation-heavy profile selects B+; balanced, read-heavy and batch-heavy profiles select RRB. The profile also selects the default page capacity.
 
-- **B+ tree:** balanced leaf and branch occupancy with subtree-size metadata.
-- **RRB-style tree:** relaxed occupancy with subtree-size metadata and path copying.
+- **B+ tree:** keeps non-root leaves and branches at or above their minimum occupancy through redistribution or merging.
+- **RRB tree:** stores cumulative subtree sizes for relaxed navigation. After deletion, it rebalances underfilled siblings while preserving relaxed size metadata and equal leaf depth.
 
-The independent evaluation selected RRB as the primary sequence engine. B+ remains available as a separately implemented alternative. `Vector` defaults to RRB.
+## Page capacity and branching
 
-The completed comparison covers indexed reads, updates, insertions, deletions, range deletion, batch updates, mixed operations and sequential iteration at 100K, 1M and 5M elements. Controlled-GC profiling measures sampled allocations and retained snapshot memory.
+Reference pages use a default capacity of 256. The read-heavy profile selects 512 below one million values and 1024 at or above one million values. Callers can also supply a custom `pageSize` and `branchFactor`; both must be safe integers of at least four.
 
-## Page capacity
+The chosen page capacity and branch factor remain stable for the lifetime of a vector. Conversion can rebuild the vector with different options.
 
-Reference pages use bounded capacities of 256, 512 and 1024 elements.
+## Storage model
 
-The balanced and mutation-heavy profiles select 256-element pages. The read-heavy profile selects 512-element pages below 1M elements and 1024-element pages from 1M upward.
+The current implementation uses reference pages containing arbitrary JavaScript values. Branch metadata is represented with ordinary JavaScript arrays and scalar fields.
 
-The selected capacity remains stable for the lifetime of a vector. Splits, rebalancing and relaxed-node edits preserve earlier snapshots.
-
-## Storage backends
-
-Reference and numeric collections share collection-level interfaces while retaining specialized page implementations.
-
-- **Reference pages:** arbitrary JavaScript values and object references.
-- **Numeric pages:** typed arrays for integer and floating-point data.
-- **Bit-packed pages:** flags, validity masks and compact boolean data.
-- **Sparse metadata:** tombstones and deferred compaction.
-
-Numeric pages must preserve the selected typed-array representation and its conversion semantics.
+Typed-array numeric pages, bit-packed pages, sparse/tombstone storage and worker-owned storage are not implemented in this release. They should not be described as current backends or public capabilities.
 
 ## Version and ownership rules
 
 - Every committed version has an immutable root.
-- Published nodes and pages never mutate.
-- Unchanged subtrees remain shared.
-- A no-op update reuses the original root.
-- Earlier snapshots remain readable after later commits.
-- JavaScript garbage collection manages unreachable roots, nodes and pages.
+- Published nodes and pages are not mutated.
+- Unchanged subtrees remain shared between versions.
+- A no-op point update can return the existing vector.
+- Earlier snapshots remain readable after later updates.
+- JavaScript garbage collection reclaims unreachable roots, nodes and pages.
 
-Reference pages preserve the identity of stored values. Collection immutability applies to ArrayForge's storage structure.
+Reference pages preserve the identity and mutability of stored values. ArrayForge guarantees structural immutability, not deep immutability of user data.
 
 ## Transactions
 
-Both transaction styles are part of the public design:
+Transactions are synchronous. A builder stages point writes in a map and flushes them through `setMany()` before structural operations or commit. This preserves operation order while grouping pending point updates. A callback exception or thenable return rolls back the builder and leaves the original vector unchanged.
 
-```ts
-const next = vector.transact((draft) => {
-  draft.set(100, valueA);
-  draft.set(200, valueB);
-});
-```
+## Implemented sequence operations
 
-```ts
-const builder = vector.builder();
-builder.set(100, valueA);
-builder.set(200, valueB);
-const next = builder.commit();
-```
+The public contract includes indexed reads and updates, insertion, point deletion, half-open range deletion, `slice`, `splice`, `concat`, conversion between tree types, iteration, callback visitation, snapshots, builders and callback transactions.
 
-Pending point writes are grouped by subtree range and committed through `setMany()`. Each touched leaf and each affected ancestor is copied once per batch. Structural operations flush pending writes first, preserving operation order.
+## Complexity goals
 
-A commit publishes one new root. If the callback throws, the original version remains unchanged.
+| Operation            | Expected cost                                                    |
+| -------------------- | ---------------------------------------------------------------- |
+| Snapshot             | O(1)                                                             |
+| Indexed lookup       | O(log N) tree navigation, plus page-local access                 |
+| Point update         | O(log N + page copy)                                             |
+| Insert/delete        | O(log N + page copy), plus local balancing                       |
+| Sequential traversal | O(N)                                                             |
+| Batch point writes   | Shared traversal of affected paths and one copy per touched page |
 
-Initial transactions are synchronous. Worker communication uses explicit data boundaries.
+The exact constants depend on page capacity, branch factor, tree shape and workload.
 
-## Sequence operations
+## Benchmark scope
 
-The collection API will cover indexed reads and updates, insertion, deletion, range deletion, splice, slice, concatenation, move, mapping, filtering and iteration.
-
-Sequence ranges use a half-open interval: start inclusive, end exclusive. Ordered deletion updates subtree sizes and rebalances affected nodes without shifting the remaining collection.
-
-Logical deletion through tombstones is a separate operation from ordered deletion. Physical and logical indexes remain distinct.
-
-## Performance targets
-
-| Operation            | Target complexity                         |
-| -------------------- | ----------------------------------------- |
-| Snapshot             | O(1)                                      |
-| Indexed lookup       | O(log N)                                  |
-| Point update         | O(log N + page copy)                      |
-| Point deletion       | O(log N + page copy)                      |
-| Sequential iteration | O(N)                                      |
-| Batch mutation       | Reuse each touched page and modified path |
-
-The benchmark suite covers 100K, 1M, 5M, 10M and 50M elements. Results include latency percentiles, throughput, heap, external memory, ArrayBuffer memory, RSS and checksums. The independent tree evaluation is recorded in `docs/benchmarks/independent-tree-evaluation.md`.
+The checked-in scale run covers 100K, 1M, 5M and 10M values. The benchmark tooling also supports independent workload runs and allocation/retention profiling.
 
 ## Runtime
 
-The initial implementation uses TypeScript. WebAssembly can be added to measured numeric or bulk-operation hot paths later, while keeping the JavaScript API and persistent version model stable.
+The package is implemented in TypeScript and targets Node.js 26 or newer. The browser benchmark is built with Vite. WebAssembly and worker-based execution are not part of the current package.

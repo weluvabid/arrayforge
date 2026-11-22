@@ -10,6 +10,7 @@ interface ImmutableList {
   concat(other: ImmutableList): ImmutableList;
   withMutations(callback: (list: MutableImmutableList) => void): ImmutableList;
   [Symbol.iterator](): Iterator<number>;
+  forEach(callback: (value: number, index: number) => void): void;
 }
 
 interface MutableImmutableList {
@@ -47,5 +48,6 @@ export async function loadImmutableAdapter(): Promise<CollectionAdapter> {
       }),
     snapshot: (collection) => collection,
     iterate: (collection) => collection as ImmutableList,
+    forEach: (collection, callback) => (collection as ImmutableList).forEach(callback),
   };
 }
