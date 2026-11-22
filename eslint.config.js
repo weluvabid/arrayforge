@@ -5,13 +5,8 @@ import tseslint from 'typescript-eslint';
 
 const paddingLineBetweenStatements = [
   'error',
-  { blankLine: 'always', prev: ['const', 'let', 'var'], next: '*' },
-  { blankLine: 'any', prev: ['const', 'let', 'var'], next: ['const', 'let', 'var'] },
-  { blankLine: 'always', prev: '*', next: ['function', 'class'] },
   { blankLine: 'always', prev: ['if', 'for', 'while', 'switch', 'try'], next: '*' },
   { blankLine: 'always', prev: '*', next: ['if', 'for', 'while', 'switch', 'try'] },
-  { blankLine: 'always', prev: '*', next: 'return' },
-  { blankLine: 'always', prev: 'return', next: '*' },
 ];
 
 export default tseslint.config(
@@ -22,6 +17,8 @@ export default tseslint.config(
       '**/dist/**',
       '**/build/**',
       '**/target/**',
+      '**/reports/**',
+      'pnpm-lock.yaml',
     ],
   },
   eslint.configs.recommended,
@@ -71,6 +68,12 @@ export default tseslint.config(
     },
     rules: {
       '@typescript-eslint/no-floating-promises': ['error', { ignoreVoid: false }],
+    },
+  },
+  {
+    files: ['benchmarks/browser/**/*.ts'],
+    languageOptions: {
+      globals: { ...globals.browser },
     },
   },
 );

@@ -1,76 +1,89 @@
-# OSS Repository Template
+# ArrayForge
 
-A small, reusable baseline for independent open-source repositories.
+ArrayForge is a persistent collection engine for JavaScript and TypeScript. It is designed for applications that work with large datasets and need efficient updates, snapshots and history.
 
-This repository contains language-agnostic repository hygiene plus optional tooling profiles.
+## Current work
 
-## What's included
+The benchmark laboratory compares native JavaScript arrays with Immer, Mutative and Immutable.js. It includes workloads for reads, updates, inserts, deletes, batch updates, range deletes, snapshots and sequential iteration.
 
-### Core
-- EditorConfig defaults.
-- General-purpose Git ignore rules.
-- Conventional Commit message validation.
-- A Git hook installer that respects an existing `core.hooksPath`.
-- Pull request and contribution templates.
-- Guidance for branch protection and repository setup.
+The browser and command-line runners compare all five adapters and export results as JSON or CSV.
 
-### Optional profiles
-- `profiles/node-pnpm/` — Node.js + pnpm CI, formatting, linting, and hook conventions.
-- `profiles/typescript/` — ESLint flat config and Prettier defaults for JS/TS projects.
+## Requirements
 
-Profiles are reference files. Copy only the files a project actually needs; do not blindly install every profile.
+- Node.js 26.13.0
+- pnpm 12
 
-## Create a repository from this template
+Install the project dependencies:
 
-1. Create a public GitHub repository named `oss-template`.
-2. Push the contents of this repository to its `main` branch.
-3. Open **Settings → General → Template repository** and enable **Template repository**.
-4. For a new project, select **Use this template → Create a new repository**.
-5. Choose the owner, repository name, visibility, and create it.
+```sh
+pnpm install
+```
 
-A repository created from a GitHub template gets its own history. It does not retrofit existing repositories.
+## Run the benchmark lab
 
-## Adopt the core hooks
+Run a quick local suite:
 
-The core hook installer is a shell script and does not require Node.js:
+```sh
+pnpm bench:smoke
+```
+
+Run the default suite:
+
+```sh
+pnpm bench
+```
+
+Choose dataset sizes, adapters and workloads:
+
+```sh
+pnpm bench -- --sizes 100000,1000000 --adapter native-copy,immer --workload point-update,batch-update
+```
+
+Save a machine-readable report:
+
+```sh
+pnpm bench -- --sizes 100000,1000000 --format json --output reports/baseline.json
+pnpm bench -- --sizes 100000,1000000 --format csv --output reports/baseline.csv
+```
+
+The runner records runtime and platform information in JSON reports. Use the same machine, Node.js version, dataset sizes and benchmark options when comparing runs.
+
+## Browser benchmarks
+
+Start the browser runner:
+
+```sh
+pnpm bench:browser
+```
+
+Open [http://127.0.0.1:4173](http://127.0.0.1:4173), choose a dataset and workload, then run the comparison. The page compares native arrays, Immer, Mutative and Immutable.js in the same browser runtime. Chromium may expose heap measurements through `performance.memory`; other browsers may leave that field unavailable.
+
+Build the browser runner:
+
+```sh
+pnpm bench:browser:build
+```
+
+## Development
+
+```sh
+pnpm check
+pnpm bench:smoke
+```
+
+`pnpm check` runs formatting, linting, TypeScript checks and tests. Git hooks can be installed with:
 
 ```sh
 sh scripts/install-hooks.sh
 ```
 
-It configures Git to use `.githooks/`.
+## Architecture
 
-The `commit-msg` hook enforces this Conventional Commit subject format:
+- [Architecture specification](docs/architecture/specification.md)
+- [Architecture overview](docs/architecture/overview.md)
+- [Engineering roadmap](docs/roadmap.md)
+- [Architecture decisions](docs/architecture/decisions.md)
+- [Benchmark methodology](docs/benchmarks/methodology.md)
+- [Initial benchmark run](docs/benchmarks/initial-run.md)
 
-```text
-type(scope): imperative description
-```
-
-Examples:
-
-```text
-feat(cache): add weighted eviction
-fix(shell): preserve focus after navigation
-docs: explain local development
-chore: update repository tooling
-```
-
-Allowed types are `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, and `revert`.
-
-## Adopt an optional profile
-
-Read the profile's `README.md` before copying files. Each profile documents:
-- Which files to copy.
-- Required development dependencies.
-- Required package scripts.
-- What is intentionally excluded.
-
-## Repository setup after creation
-
-Recommended baseline:
-- Protect `main`; require pull requests and passing CI before merge.
-- Require branches to be up to date if the project benefits from strict merge validation.
-- Enable Dependabot only for ecosystems the project actually uses.
-- Keep Actions permissions read-only by default; grant write permissions per job.
-- Pin third-party GitHub Actions to full commit SHAs and retain a version comment.
-- Keep release and deployment workflows out of the baseline unless the project needs them.
+The tree selection, page sizing and storage details are recorded in the architecture decisions and will be evaluated through the benchmark work.

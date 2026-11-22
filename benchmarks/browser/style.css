@@ -1,0 +1,184 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  background: #0b1020;
+  color: #e5e7eb;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+.shell {
+  width: min(1100px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 64px 0 36px;
+}
+
+.header {
+  max-width: 720px;
+  margin-bottom: 36px;
+}
+
+.eyebrow {
+  color: #a78bfa;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+h1 {
+  margin: 12px 0;
+  font-size: clamp(36px, 6vw, 58px);
+  letter-spacing: -0.055em;
+}
+
+.intro,
+footer,
+.status {
+  color: #9ca3af;
+  line-height: 1.6;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 20px;
+  border: 1px solid #273044;
+  border-radius: 14px;
+  background: #111827;
+}
+
+label {
+  display: grid;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
+select,
+button {
+  min-height: 42px;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #0b1020;
+  color: #f9fafb;
+  font: inherit;
+}
+
+button {
+  border-color: #8b5cf6;
+  background: #7c3aed;
+  cursor: pointer;
+  font-weight: 650;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+button.secondary {
+  border-color: #374151;
+  background: #1f2937;
+}
+
+.status {
+  min-height: 26px;
+  margin: 16px 2px 28px;
+  font-size: 13px;
+}
+
+.results {
+  padding: 20px;
+  border: 1px solid #273044;
+  border-radius: 14px;
+  background: #111827;
+}
+
+.results-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  white-space: nowrap;
+}
+
+th,
+td {
+  padding: 13px 12px;
+  border-bottom: 1px solid #273044;
+  font-size: 13px;
+}
+
+th {
+  color: #9ca3af;
+  font-weight: 550;
+}
+
+td:first-child {
+  color: #c4b5fd;
+  font-weight: 650;
+}
+
+.empty {
+  color: #9ca3af;
+  text-align: center;
+}
+
+footer {
+  margin-top: 22px;
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .shell {
+    padding-top: 36px;
+  }
+
+  .controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .controls button {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 460px) {
+  .controls {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#111827" />
+    <title>ArrayForge browser benchmarks</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <p class="eyebrow">ARRAYFORGE · BENCHMARK LAB</p>
+        <h1>Browser performance</h1>
+        <p class="intro">
+          Run the same collection workloads in your browser and compare native array strategies.
+        </p>
+      </header>
+
+      <section class="controls" aria-label="Benchmark settings">
+        <label>
+          Dataset size
+          <select id="size">
+            <option value="10000">10,000</option>
+            <option value="100000" selected>100,000</option>
+            <option value="1000000">1,000,000</option>
+            <option value="5000000">5,000,000</option>
+            <option value="10000000">10,000,000</option>
+          </select>
+        </label>
+        <label>
+          Workload
+          <select id="workload">
+            <option value="point-read">Random read</option>
+            <option value="point-update" selected>Point update</option>
+            <option value="point-insert">Point insert</option>
+            <option value="point-delete">Point delete</option>
+            <option value="batch-update">Batch update (1,000 items)</option>
+            <option value="range-delete">Range delete</option>
+            <option value="snapshot">Snapshot</option>
+            <option value="sequential-iteration">Sequential iteration</option>
+          </select>
+        </label>
+        <label>
+          Measured rounds
+          <select id="rounds">
+            <option value="3">3</option>
+            <option value="5" selected>5</option>
+            <option value="7">7</option>
+          </select>
+        </label>
+        <button id="run" type="button">Run benchmark</button>
+      </section>
+
+      <p id="status" class="status" role="status">Ready to run.</p>
+
+      <section class="results" aria-live="polite">
+        <div class="results-heading">
+          <h2>Results</h2>
+          <button id="download" class="secondary" type="button" disabled>Export JSON</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Adapter</th>
+                <th>p50 / operation</th>
+                <th>Operations / sec</th>
+                <th>Heap change</th>
+                <th>Checksum</th>
+              </tr>
+            </thead>
+            <tbody id="results">
+              <tr>
+                <td colspan="5" class="empty">Choose a workload and run the benchmark.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer>
+        Results depend on the browser, device, available memory and background activity.
+      </footer>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
