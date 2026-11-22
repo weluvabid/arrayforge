@@ -1,6 +1,8 @@
 # ArrayForge browser benchmark
 
-A small Vite application built with vanilla TypeScript, Tailwind CSS 4 and DaisyUI for Browser benchmark.
+A small Vite application built with vanilla TypeScript, Tailwind CSS 4 and DaisyUI for browser benchmarking.
+
+**[Open the live browser benchmark](https://weluvabid.github.io/arrayforge/)**
 
 ## Run locally
 

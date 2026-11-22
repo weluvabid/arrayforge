@@ -1,6 +1,6 @@
 # Performance notes
 
-These results describe the checked-in benchmark runs, not a promise that every workload or machine will see the same numbers. The two engines have different strengths, and the right choice depends on the shape of the work.
+The checked-in results compare the B+ and RRB engines across large datasets and representative collection operations.
 
 ## Test environment
 
@@ -23,7 +23,7 @@ At one million values, both trees are in the same general range for common point
 | Iterator traversal | 15.39 ms | 15.41 ms |
 | Callback traversal |  8.12 ms |  7.86 ms |
 
-The earlier pre-correction evaluation reported an RRB advantage for range deletion, while the current scale run favours B+ at one and ten million values. Those runs used different benchmark revisions, so the old result is historical rather than a direct apples-to-apples comparison. The current result is another reason not to describe either engine as universally faster.
+The earlier pre-correction evaluation reported an RRB advantage for range deletion, while the current scale run favours B+ at one and ten million values. Those runs used different benchmark revisions, so the old result is historical rather than a direct apples-to-apples comparison. The results show different strengths across the two engines and workloads.
 
 At ten million values, the 256-page results were:
 

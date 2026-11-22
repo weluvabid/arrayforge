@@ -2,6 +2,8 @@
 
 ArrayForge exposes one immutable vector contract backed by two independent persistent tree implementations.
 
+![ArrayForge architecture: one immutable vector API, independent B+ and RRB tree engines, and persistent storage through structural sharing](arrayforge-architecture.png)
+
 ## Main parts
 
 1. **Vector API** — indexed access, sequence edits, conversion, snapshots, iteration and transactions.
@@ -21,8 +23,6 @@ Immutability applies to the collection's storage structure. Values in reference 
 ## Pages and metadata
 
 The current implementation stores arbitrary JavaScript values in bounded reference pages. Branch nodes keep child references and subtree-size metadata used for indexed navigation. Regular branches also cache a uniform child span so navigation can use arithmetic descent; ragged branches use cumulative-size lookup.
-
-The current package does not include typed-array numeric collections, bit-packed pages or a sparse/tombstone backend. Those were explored in the broader design but are not part of this implementation.
 
 ## Transactions
 
