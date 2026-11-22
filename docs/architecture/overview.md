@@ -2,6 +2,8 @@
 
 ArrayForge exposes one immutable vector contract backed by two independent persistent tree implementations.
 
+![ArrayForge architecture: one immutable vector API, independent B+ and RRB tree engines, and persistent storage through structural sharing](arrayforge-architecture.png)
+
 ## Main parts
 
 1. **Vector API** — indexed access, sequence edits, conversion, snapshots, iteration and transactions.

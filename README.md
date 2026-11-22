@@ -4,6 +4,10 @@ Persistent vectors for large JavaScript and TypeScript datasets.
 
 ArrayForge keeps earlier versions of a collection available while you create updated ones. A point update copies the affected page and the tree nodes along its path. Unchanged parts of the structure are shared between versions, so creating a snapshot is constant-time.
 
+**[Explore the live browser benchmark](https://weluvabid.github.io/arrayforge/)**
+
+![ArrayForge architecture: one immutable vector API, independent B+ and RRB tree engines, and persistent storage through structural sharing](docs/architecture/arrayforge-architecture.png)
+
 ## Install
 
 ```sh
@@ -104,7 +108,7 @@ The built-in sizes are `PAGE_SIZE.SMALL` (256), `PAGE_SIZE.MEDIUM` (512), and `P
 
 ## Performance
 
-The checked-in Node benchmark runs cover 100K, 1M, 5M and 10M elements. They show where the two trees trade places rather than one implementation winning every workload. The results and the measurement limits are described in the [performance notes](docs/performance.md).
+The [live browser benchmark](https://weluvabid.github.io/arrayforge/) compares ArrayForge's B+ and RRB engines with native arrays, Immer, Mutative and Immutable.js. The checked-in Node benchmark runs cover 100K, 1M, 5M and 10M elements. They show where the two trees trade places rather than one implementation winning every workload. The results and the measurement limits are described in the [performance notes](docs/performance.md).
 
 ## Documentation
 
