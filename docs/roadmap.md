@@ -31,8 +31,11 @@
 
 ## Phase 3 — Transaction engine
 
+**Status: Complete**
+
 - Add callback transactions and explicit builders.
-- Track page ownership and clone each touched page once.
+- Batch point writes by subtree range; clone each touched page once per flush.
+- Flush before structural operations to preserve mutation order.
 - Add commit, rollback and no-op detection.
 
 ## Phase 4 — Sequence operations

@@ -110,7 +110,7 @@ function runSample(
 
 const DEFAULT_TARGET_SAMPLE_MS = 25;
 
-function maximumIterations(workload: WorkloadName, size: number): number {
+function maximumIterations(workload: WorkloadName): number {
   switch (workload) {
     case 'point-read':
       return 100_000;
@@ -121,9 +121,9 @@ function maximumIterations(workload: WorkloadName, size: number): number {
     case 'point-insert':
       return 1_000;
     case 'point-delete':
-      return Math.max(1, Math.min(1_000, Math.floor(size / 10)));
+      return 50_000;
     case 'range-delete':
-      return 32;
+      return 5_000;
     case 'snapshot':
       return 1_000;
     case 'sequential-iteration':
@@ -152,7 +152,7 @@ function calibrateIterations(
     measureProbe(initialIterations),
   ];
   const elapsedMs = percentile(probeDurations, 50);
-  const maximum = maximumIterations(workload, options.size);
+  const maximum = maximumIterations(workload);
   const estimated = Math.min(
     maximum,
     Math.max(initialIterations, Math.ceil((initialIterations * targetSampleMs) / elapsedMs)),

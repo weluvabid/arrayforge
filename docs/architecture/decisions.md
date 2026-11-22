@@ -2,17 +2,17 @@
 
 These decisions define the starting point for ArrayForge implementation.
 
-## ADR-001: Evaluate B+ tree and RRB tree before choosing
+## ADR-001: Implement independent persistent tree candidates
 
-**Decision:** Build comparable benchmark candidates for a persistent B+ tree and a relaxed radix-balanced tree.
+**Decision:** Maintain separate B+ and RRB implementations behind one collection interface.
 
-**Reason:** Both structures offer structural sharing, but their behaviour differs across indexed access, sequence edits, concatenation and iteration. The workload results will determine the primary implementation.
+**Reason:** Their balancing and occupancy policies are materially different. Separate node representations and algorithms make correctness and workload comparisons meaningful.
 
-## ADR-002: Use adaptive reference page capacity
+## ADR-002: Select page capacity by workload profile
 
-**Decision:** Evaluate bounded page capacities of 256, 512 and 1024 elements, then select an adaptive policy from measured results.
+**Decision:** Use 256-element pages for balanced and mutation-heavy workloads, 512 for read-heavy collections below one million elements, and 1024 for read-heavy collections from one million elements upward.
 
-**Reason:** Page size affects copy cost, tree depth, memory overhead and iteration locality. A single fixed capacity should not be selected without measurements.
+**Reason:** Page size affects copy cost, tree depth, memory overhead and iteration locality. The measured workload trade-offs favour a small balanced default with larger read-specialized configurations.
 
 ## ADR-003: Share collection interfaces across specialized storage
 
@@ -44,18 +44,20 @@ These decisions define the starting point for ArrayForge implementation.
 
 **Reason:** This invariant makes snapshots safe to share and gives transactions a clear copy-on-write boundary.
 
-## ADR-008: Keep both tree candidates under evaluation
+## ADR-008: Select RRB as the primary persistent sequence structure
 
-**Decision:** Retain both persistent B+ tree and RRB-style candidates. `Vector` currently defaults to the RRB-style implementation while the primary structure remains unselected.
+**Decision:** Use the independently implemented RRB tree as the primary vector engine. Keep the independently implemented B+ tree as a supported alternative.
 
-**Reason:** The measured workloads do not identify a consistent winner. RRB has an advantage in range deletion, while B+ is competitive or faster in point operations, batch updates and snapshots. Mixed workloads, optimized iteration and controlled memory measurements are part of the remaining evaluation.
+**Reason:** The 100K, 1M and 5M evaluation shows RRB's stronger overall fit across range deletion, large-dataset reads, iteration and batch updates. B+ remains competitive or faster for point updates and selected mixed workloads. Both implementations have separate node representations, structural invariants and mutation algorithms; the decision is no longer based on two policies over one shared implementation.
 
-## ADR-009: Select reference page capacity from workload profile
+## ADR-009: Use 256-element pages as the balanced default
 
-**Decision:** Support 256, 512 and 1024 element pages. The balanced profile selects 256 elements up to 100K items and 512 above that size. Mutation-heavy workloads use 256-element pages. Read-heavy workloads use 1024-element pages from one million items upward.
+**Decision:** Use 256-element reference pages for balanced and mutation-heavy vectors. Use 512-element pages for read-heavy collections below one million elements and 1024-element pages for read-heavy collections from one million elements upward.
 
-**Reason:** The benchmark runs showed different page sizes working well for mutation batches and sequential iteration. The profile makes that trade-off explicit at construction time.
+**Reason:** The benchmark comparison shows 256 as the most consistent general-purpose choice for point mutation and mixed workloads. Larger pages can improve read throughput at scale, but increase copy costs for updates. Page capacity is fixed for each vector's lifetime.
 
-## Tree candidate implementation status
+## ADR-010: Batch transaction writes by touched page
 
-The exported B+ and RRB-style vectors currently share `PersistentTreeVector` and its node representation. Their only algorithmic distinction is deletion rebalancing. The existing benchmark data is useful for comparing those policies, but does not yet establish a winner between two distinct tree structures. Separate implementations are required before ADR-008 can be closed.
+**Decision:** Provide callback transactions and explicit builders. Accumulate point writes and commit them through a sorted `setMany()` traversal. Flush pending writes before structural operations to preserve operation order.
+
+**Reason:** A batch traverses each affected subtree once, copies each touched leaf once and rebuilds each affected ancestor once. This avoids repeatedly copying the same page for multiple writes within a transaction while preserving immutable published roots.

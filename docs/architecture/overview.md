@@ -5,7 +5,7 @@ ArrayForge separates the collection API from the structures that store its data.
 ## Main layers
 
 1. **Collection API** — indexed access, sequence operations, snapshots and transactions.
-2. **Persistent tree** — navigation, subtree sizes, structural sharing and path copying.
+2. **Persistent tree** — independent B+ and RRB engines with separate node invariants, subtree-size metadata and path-copying algorithms.
 3. **Storage backends** — reference pages, numeric pages and packed metadata.
 4. **Transaction engine** — tracks writable pages and publishes a new root on commit.
 5. **Runtime support** — iteration, allocation diagnostics and browser integration.
@@ -22,6 +22,6 @@ Reference pages store arbitrary JavaScript values. Numeric pages use typed array
 
 ## Transactions
 
-A transaction owns the pages it changes. The first write to a shared page creates a private copy. Later writes in the same transaction reuse that copy. Commit publishes a new root; an exception leaves the original collection unchanged.
+A transaction stages point writes and applies them through a sorted `setMany()` traversal. Each touched leaf and affected ancestor is copied once per batch. Structural operations flush pending writes first so operation order is preserved. Commit publishes one new root; an exception leaves the original collection unchanged. Transactions are synchronous.
 
-Both callback transactions and explicit builder/commit workflows are part of the planned API.
+Both callback transactions (`transact()`) and explicit builder/commit workflows (`builder()`) are implemented.

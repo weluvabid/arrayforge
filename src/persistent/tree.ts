@@ -1,4 +1,18 @@
+import { RrbVector } from './rrb.ts';
 export type TreeKind = 'bplus' | 'rrb';
+
+function consumeThenable(value: object): void {
+  const then = (value as { then?: unknown }).then;
+
+  if (typeof then === 'function') {
+    (
+      then as (
+        onFulfilled?: (result: unknown) => void,
+        onRejected?: (reason: unknown) => void,
+      ) => unknown
+    ).call(value, undefined, () => undefined);
+  }
+}
 
 export type PageProfile = 'balanced' | 'mutation-heavy' | 'read-heavy';
 
@@ -21,7 +35,7 @@ export function selectPageCapacity(length: number, profile: PageProfile = 'balan
     return length >= 1_000_000 ? 1024 : 512;
   }
 
-  return length <= 100_000 ? 256 : 512;
+  return 256;
 }
 
 interface LeafNode<T> {
@@ -185,6 +199,85 @@ function setNode<T>(node: TreeNode<T>, index: number, value: T): TreeNode<T> {
   children[selected] = updated;
 
   return branch(children);
+}
+
+function lowerBound<T>(changes: readonly (readonly [number, T])[], target: number): number {
+  let low = 0;
+  let high = changes.length;
+
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+
+    if ((changes[middle]?.[0] ?? Number.POSITIVE_INFINITY) < target) {
+      low = middle + 1;
+    } else {
+      high = middle;
+    }
+  }
+
+  return low;
+}
+
+function setManyNode<T>(
+  node: TreeNode<T>,
+  changes: readonly (readonly [number, T])[],
+  from: number,
+  to: number,
+  offset = 0,
+): TreeNode<T> {
+  if (from >= to) {
+    return node;
+  }
+
+  if (node.kind === 'leaf') {
+    let items: T[] | undefined;
+
+    for (let index = from; index < to; index += 1) {
+      const change = changes[index];
+
+      if (!change) {
+        continue;
+      }
+
+      const local = change[0] - offset;
+      const current = items ? items[local] : node.items[local];
+
+      if (!Object.is(current, change[1])) {
+        items ??= node.items.slice() as T[];
+        items[local] = change[1];
+      }
+    }
+
+    return items ? leaf(items) : node;
+  }
+
+  let children: TreeNode<T>[] | undefined;
+  let childOffset = offset;
+  let cursor = from;
+
+  for (let childIndex = 0; childIndex < node.children.length; childIndex += 1) {
+    const child = node.children[childIndex] as TreeNode<T>;
+    const childEnd = childOffset + child.length;
+    const nextCursor = lowerBound(changes, childEnd);
+
+    if (cursor < nextCursor) {
+      const updated = setManyNode(child, changes, cursor, nextCursor, childOffset);
+
+      if (updated !== child) {
+        children ??= node.children.slice() as TreeNode<T>[];
+        children[childIndex] = updated;
+      }
+    }
+
+    cursor = nextCursor;
+    childOffset = childEnd;
+
+    if (cursor >= to) {
+      break;
+    }
+  }
+
+  return children ? branch(children) : node;
 }
 
 function insertNode<T>(
@@ -476,35 +569,101 @@ function normalizeRoot<T>(node: TreeNode<T>): TreeNode<T> {
   return root;
 }
 
+function assertBPlusNode<T>(
+  node: TreeNode<T>,
+  isRoot: boolean,
+  pageCapacity: number,
+  branchFactor: number,
+): void {
+  if (node.kind === 'leaf') {
+    if (
+      node.length !== node.items.length ||
+      node.length > pageCapacity ||
+      (!isRoot && node.length < Math.ceil(pageCapacity / 2))
+    ) {
+      throw new Error('B+ tree leaf occupancy invariant failed.');
+    }
+
+    return;
+  }
+
+  if (
+    node.children.length > branchFactor ||
+    node.children.length < (isRoot ? 2 : Math.ceil(branchFactor / 2))
+  ) {
+    throw new Error('B+ tree branch occupancy invariant failed.');
+  }
+
+  let total = 0;
+  const expectedHeight = node.children[0]?.height;
+
+  for (let index = 0; index < node.children.length; index += 1) {
+    const child = node.children[index];
+
+    if (!child || child.height !== expectedHeight) {
+      throw new Error('B+ tree leaf-depth invariant failed.');
+    }
+
+    assertBPlusNode(child, false, pageCapacity, branchFactor);
+    total += child.length;
+
+    if (node.sizes[index] !== total) {
+      throw new Error('B+ tree subtree-size metadata invariant failed.');
+    }
+  }
+
+  if (node.length !== total || node.height !== (expectedHeight ?? -1) + 1) {
+    throw new Error('B+ tree aggregate metadata invariant failed.');
+  }
+}
+
 function validateCapacity(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value < 4) {
     throw new RangeError(`${name} must be an integer greater than or equal to 4.`);
   }
 }
 
-export class PersistentTreeVector<T> implements Iterable<T> {
+export interface VectorDraft<T> {
+  readonly length: number;
+  get(index: number): T | undefined;
+  set(index: number, value: T): this;
+  insert(index: number, value: T): this;
+  delete(index: number): this;
+  deleteRange(start: number, end: number): this;
+}
+
+export interface PersistentTreeVector<T> extends Iterable<T> {
+  [Symbol.iterator](): IterableIterator<T>;
+  readonly length: number;
+  readonly kind: TreeKind;
+  readonly pageCapacity: number;
+  get(index: number): T | undefined;
+  set(index: number, value: T): PersistentTreeVector<T>;
+  setMany(
+    changes: readonly { readonly index: number; readonly value: T }[],
+  ): PersistentTreeVector<T>;
+  insert(index: number, value: T): PersistentTreeVector<T>;
+  delete(index: number): PersistentTreeVector<T>;
+  deleteRange(start: number, end: number): PersistentTreeVector<T>;
+  snapshot(): PersistentTreeVector<T>;
+  toArray(): T[];
+  builder(): VectorBuilder<T>;
+  transact(callback: (draft: VectorDraft<T>) => void): PersistentTreeVector<T>;
+  assertValid(): void;
+}
+
+export class BPlusVectorImpl<T> implements PersistentTreeVector<T> {
   readonly #root: TreeNode<T>;
   readonly #pageCapacity: number;
   readonly #branchFactor: number;
-  readonly #kind: TreeKind;
 
-  private constructor(
-    root: TreeNode<T>,
-    kind: TreeKind,
-    pageCapacity: number,
-    branchFactor: number,
-  ) {
+  private constructor(root: TreeNode<T>, pageCapacity: number, branchFactor: number) {
     this.#root = root;
-    this.#kind = kind;
     this.#pageCapacity = pageCapacity;
     this.#branchFactor = branchFactor;
   }
 
-  static from<T>(
-    values: readonly T[],
-    kind: TreeKind,
-    options: TreeOptions = {},
-  ): PersistentTreeVector<T> {
+  static from<T>(values: readonly T[], options: TreeOptions = {}): BPlusVectorImpl<T> {
     const pageCapacity =
       options.pageCapacity === undefined || options.pageCapacity === 'adaptive'
         ? selectPageCapacity(values.length, options.profile)
@@ -514,20 +673,23 @@ export class PersistentTreeVector<T> implements Iterable<T> {
     validateCapacity(pageCapacity, 'pageCapacity');
     validateCapacity(branchFactor, 'branchFactor');
 
-    return new PersistentTreeVector(
+    return new BPlusVectorImpl(
       buildTree(values, pageCapacity, branchFactor),
-      kind,
       pageCapacity,
       branchFactor,
     );
+  }
+
+  assertValid(): void {
+    assertBPlusNode(this.#root, true, this.#pageCapacity, this.#branchFactor);
   }
 
   get length(): number {
     return this.#root.length;
   }
 
-  get kind(): TreeKind {
-    return this.#kind;
+  get kind(): 'bplus' {
+    return 'bplus';
   }
 
   get pageCapacity(): number {
@@ -546,7 +708,51 @@ export class PersistentTreeVector<T> implements Iterable<T> {
 
     return root === this.#root
       ? this
-      : new PersistentTreeVector(root, this.#kind, this.#pageCapacity, this.#branchFactor);
+      : new BPlusVectorImpl(root, this.#pageCapacity, this.#branchFactor);
+  }
+
+  setMany(
+    changes: readonly { readonly index: number; readonly value: T }[],
+  ): PersistentTreeVector<T> {
+    const pending = new Map<number, T>();
+
+    for (const change of changes) {
+      this.#assertIndex(change.index);
+      pending.set(change.index, change.value);
+    }
+
+    const sorted = [...pending].sort(([left], [right]) => left - right);
+    const root = setManyNode(this.#root, sorted, 0, sorted.length);
+
+    return root === this.#root
+      ? this
+      : new BPlusVectorImpl(root, this.#pageCapacity, this.#branchFactor);
+  }
+
+  builder(): VectorBuilder<T> {
+    return new VectorBuilder(this);
+  }
+
+  transact(callback: (draft: VectorDraft<T>) => void): PersistentTreeVector<T> {
+    const draft = this.builder();
+
+    try {
+      const result = (callback as (value: VectorDraft<T>) => unknown)(draft);
+
+      if (
+        result !== null &&
+        (typeof result === 'object' || typeof result === 'function') &&
+        'then' in result
+      ) {
+        consumeThenable(result);
+        throw new TypeError('ArrayForge transactions must be synchronous.');
+      }
+
+      return draft.commit();
+    } catch (error) {
+      draft.rollback();
+      throw error;
+    }
   }
 
   insert(index: number, value: T): PersistentTreeVector<T> {
@@ -555,23 +761,17 @@ export class PersistentTreeVector<T> implements Iterable<T> {
     const result = insertNode(this.#root, index, value, this.#pageCapacity, this.#branchFactor);
     const root = result.right ? branch([result.left, result.right]) : result.left;
 
-    return new PersistentTreeVector(root, this.#kind, this.#pageCapacity, this.#branchFactor);
+    return new BPlusVectorImpl(root, this.#pageCapacity, this.#branchFactor);
   }
 
   delete(index: number): PersistentTreeVector<T> {
     this.#assertIndex(index);
 
     const root =
-      deleteNode(
-        this.#root,
-        index,
-        this.#pageCapacity,
-        this.#branchFactor,
-        this.#kind === 'bplus',
-      ) ?? leaf([]);
+      deleteNode(this.#root, index, this.#pageCapacity, this.#branchFactor, true) ?? leaf([]);
     const normalized = normalizeRoot(root);
 
-    return new PersistentTreeVector(normalized, this.#kind, this.#pageCapacity, this.#branchFactor);
+    return new BPlusVectorImpl(normalized, this.#pageCapacity, this.#branchFactor);
   }
 
   deleteRange(start: number, end: number): PersistentTreeVector<T> {
@@ -582,17 +782,11 @@ export class PersistentTreeVector<T> implements Iterable<T> {
     }
 
     const root =
-      deleteRangeNode(
-        this.#root,
-        start,
-        end,
-        this.#pageCapacity,
-        this.#branchFactor,
-        this.#kind === 'bplus',
-      ) ?? leaf([]);
+      deleteRangeNode(this.#root, start, end, this.#pageCapacity, this.#branchFactor, true) ??
+      leaf([]);
     const normalized = normalizeRoot(root);
 
-    return new PersistentTreeVector(normalized, this.#kind, this.#pageCapacity, this.#branchFactor);
+    return new BPlusVectorImpl(normalized, this.#pageCapacity, this.#branchFactor);
   }
 
   snapshot(): PersistentTreeVector<T> {
@@ -603,8 +797,8 @@ export class PersistentTreeVector<T> implements Iterable<T> {
     return [...this];
   }
 
-  *[Symbol.iterator](): IterableIterator<T> {
-    yield* iterateNode(this.#root);
+  [Symbol.iterator](): IterableIterator<T> {
+    return iterateNode(this.#root);
   }
 
   #assertIndex(index: number): void {
@@ -636,25 +830,112 @@ export class PersistentTreeVector<T> implements Iterable<T> {
   }
 }
 
+export class VectorBuilder<T> implements VectorDraft<T> {
+  readonly #base: PersistentTreeVector<T>;
+  #current: PersistentTreeVector<T>;
+  #pending = new Map<number, T>();
+  #state: 'open' | 'committed' | 'rolled-back' = 'open';
+
+  constructor(base: PersistentTreeVector<T>) {
+    this.#base = base;
+    this.#current = base;
+  }
+
+  get length(): number {
+    this.#assertOpen();
+    return this.#current.length;
+  }
+
+  get(index: number): T | undefined {
+    this.#assertOpen();
+    this.#assertIndex(index);
+    return this.#pending.has(index) ? this.#pending.get(index) : this.#current.get(index);
+  }
+
+  set(index: number, value: T): this {
+    this.#assertOpen();
+    this.#assertIndex(index);
+    this.#pending.set(index, value);
+    return this;
+  }
+
+  insert(index: number, value: T): this {
+    this.#assertOpen();
+    this.#flush();
+    this.#current = this.#current.insert(index, value);
+    return this;
+  }
+
+  delete(index: number): this {
+    this.#assertOpen();
+    this.#flush();
+    this.#current = this.#current.delete(index);
+    return this;
+  }
+
+  deleteRange(start: number, end: number): this {
+    this.#assertOpen();
+    this.#flush();
+    this.#current = this.#current.deleteRange(start, end);
+    return this;
+  }
+
+  commit(): PersistentTreeVector<T> {
+    this.#assertOpen();
+    this.#flush();
+    this.#state = 'committed';
+    return this.#current;
+  }
+
+  rollback(): void {
+    this.#assertOpen();
+    this.#pending.clear();
+    this.#current = this.#base;
+    this.#state = 'rolled-back';
+  }
+
+  #flush(): void {
+    if (this.#pending.size === 0) {
+      return;
+    }
+
+    this.#current = this.#current.setMany(
+      [...this.#pending].map(([index, value]) => ({ index, value })),
+    );
+    this.#pending.clear();
+  }
+
+  #assertIndex(index: number): void {
+    if (!Number.isSafeInteger(index) || index < 0 || index >= this.#current.length) {
+      throw new RangeError(
+        `Index ${index} is outside a collection of length ${this.#current.length}.`,
+      );
+    }
+  }
+
+  #assertOpen(): void {
+    if (this.#state !== 'open') {
+      throw new Error(`Transaction builder is ${this.#state}.`);
+    }
+  }
+}
+
 export type BPlusVector<T> = PersistentTreeVector<T>;
-export type RrbVector<T> = PersistentTreeVector<T>;
 
 export const BPlusVector = {
-  from<T>(values: readonly T[], options: TreeOptions = {}): BPlusVector<T> {
-    return PersistentTreeVector.from(values, 'bplus', options);
+  from<T>(values: readonly T[], options: TreeOptions = {}): PersistentTreeVector<T> {
+    return BPlusVectorImpl.from(values, options);
   },
 };
 
-export const RrbVector = {
-  from<T>(values: readonly T[], options: TreeOptions = {}): RrbVector<T> {
-    return PersistentTreeVector.from(values, 'rrb', options);
-  },
-};
+export type RrbVector<T> = PersistentTreeVector<T>;
+
+export { RrbVector };
 
 export type Vector<T> = PersistentTreeVector<T>;
 
 export const Vector = {
-  from<T>(values: readonly T[], options: TreeOptions = {}): Vector<T> {
-    return PersistentTreeVector.from(values, 'rrb', options);
+  from<T>(values: readonly T[], options: TreeOptions = {}): PersistentTreeVector<T> {
+    return RrbVector.from(values, options);
   },
 };

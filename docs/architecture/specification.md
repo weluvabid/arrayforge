@@ -26,17 +26,17 @@ ArrayForge evaluates two persistent sequence structures:
 - **B+ tree:** balanced leaf and branch occupancy with subtree-size metadata.
 - **RRB-style tree:** relaxed occupancy with subtree-size metadata and path copying.
 
-Both candidates remain under evaluation. `Vector` currently defaults to the RRB-style implementation, but this is an implementation default rather than a final architecture selection.
+The independent evaluation selected RRB as the primary sequence engine. B+ remains available as a separately implemented alternative. `Vector` defaults to RRB.
 
-The initial comparison covered indexed reads, updates, insertions, deletions, range deletion, batch updates and sequential iteration at 100K, 1M and 5M elements. The next comparison adds calibrated samples, mixed operations, optimized iteration and improved memory-retention measurements.
+The completed comparison covers indexed reads, updates, insertions, deletions, range deletion, batch updates, mixed operations and sequential iteration at 100K, 1M and 5M elements. Controlled-GC profiling measures sampled allocations and retained snapshot memory.
 
 ## Page capacity
 
 Reference pages use bounded capacities of 256, 512 and 1024 elements.
 
-The balanced profile selects 256-element pages up to 100K elements and 512-element pages above that size. The mutation-heavy profile selects 256-element pages. The read-heavy profile selects 512-element pages below 1M elements and 1024-element pages from 1M upward.
+The balanced and mutation-heavy profiles select 256-element pages. The read-heavy profile selects 512-element pages below 1M elements and 1024-element pages from 1M upward.
 
-The selected capacity remains stable for the lifetime of a vector. Splits and rebalancing preserve earlier snapshots.
+The selected capacity remains stable for the lifetime of a vector. Splits, rebalancing and relaxed-node edits preserve earlier snapshots.
 
 ## Storage backends
 
@@ -78,7 +78,7 @@ builder.set(200, valueB);
 const next = builder.commit();
 ```
 
-A transaction clones a shared page on its first write. Later writes reuse the transaction-owned page. Modified ancestor paths are tracked and reused within the transaction.
+Pending point writes are grouped by subtree range and committed through `setMany()`. Each touched leaf and each affected ancestor is copied once per batch. Structural operations flush pending writes first, preserving operation order.
 
 A commit publishes one new root. If the callback throws, the original version remains unchanged.
 
@@ -103,7 +103,7 @@ Logical deletion through tombstones is a separate operation from ordered deletio
 | Sequential iteration | O(N)                                      |
 | Batch mutation       | Reuse each touched page and modified path |
 
-The benchmark suite covers 100K, 1M, 5M, 10M and 50M elements. Results include latency percentiles, throughput, heap, external memory, ArrayBuffer memory, RSS and checksums. The Phase 2 tree evaluation is recorded in `docs/benchmarks/phase-2-tree-evaluation.md`.
+The benchmark suite covers 100K, 1M, 5M, 10M and 50M elements. Results include latency percentiles, throughput, heap, external memory, ArrayBuffer memory, RSS and checksums. The independent tree evaluation is recorded in `docs/benchmarks/independent-tree-evaluation.md`.
 
 ## Runtime
 

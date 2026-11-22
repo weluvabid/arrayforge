@@ -187,6 +187,79 @@ async function profileAllocations(kind, values) {
   }
 }
 
+function profileTransactions(kind, values) {
+  const base = createVector(kind, values);
+  const changes = Array.from({ length: UPDATES }, (_, index) => ({
+    index: (index * 7_919) % base.length,
+    value: SIZE + index,
+  }));
+  const runSequential = () => {
+    let vector = base;
+
+    for (const change of changes) {
+      vector = vector.set(change.index, change.value);
+    }
+
+    return vector;
+  };
+  const runTransaction = () =>
+    base.transact((draft) => {
+      for (const change of changes) {
+        draft.set(change.index, change.value);
+      }
+    });
+
+  for (let warmup = 0; warmup < 2; warmup += 1) {
+    runSequential();
+    runTransaction();
+  }
+
+  const sequentialDurations = [];
+  const transactionDurations = [];
+  let sequential;
+  let transactional;
+
+  for (let round = 0; round < 5; round += 1) {
+    let startedAt = performance.now();
+    sequential = runSequential();
+    sequentialDurations.push(performance.now() - startedAt);
+    collectGarbage();
+
+    startedAt = performance.now();
+    transactional = runTransaction();
+    transactionDurations.push(performance.now() - startedAt);
+    collectGarbage();
+  }
+
+  let sequentialChecksum = 0;
+  let transactionChecksum = 0;
+
+  for (const change of changes) {
+    sequentialChecksum += sequential.get(change.index) ?? 0;
+    transactionChecksum += transactional.get(change.index) ?? 0;
+  }
+
+  if (
+    sequentialChecksum !== transactionChecksum ||
+    base.get(changes[0].index) === changes[0].value
+  ) {
+    throw new Error(`${kind} transaction result does not match sequential updates.`);
+  }
+
+  const sequentialDurationMs = median(sequentialDurations);
+  const transactionDurationMs = median(transactionDurations);
+
+  return {
+    kind,
+    updates: UPDATES,
+    rounds: sequentialDurations.length,
+    sequentialDurationMs,
+    transactionDurationMs,
+    speedup: sequentialDurationMs / transactionDurationMs,
+    checksum: transactionChecksum,
+  };
+}
+
 function measureRetention(kind, values) {
   let current = createVector(kind, values);
   collectGarbage();
@@ -223,6 +296,7 @@ async function main() {
   const values = Array.from({ length: SIZE }, (_, index) => index);
   const allocationProfiles = [];
   const retentionProfiles = [];
+  const transactionProfiles = [];
 
   for (const kind of ['bplus', 'rrb']) {
     const warm = createVector(kind, values);
@@ -238,6 +312,7 @@ async function main() {
 
   for (const kind of ['bplus', 'rrb']) {
     allocationProfiles.push(await profileAllocations(kind, values));
+    transactionProfiles.push(profileTransactions(kind, values));
     retentionProfiles.push(measureRetention(kind, values));
   }
 
@@ -256,6 +331,7 @@ async function main() {
           explicitGc: hasGc,
         },
         allocationProfiles,
+        transactionProfiles,
         retentionProfiles,
       },
       null,
@@ -265,8 +341,7 @@ async function main() {
 }
 
 main().catch((error) => {
-  process.stderr.write(
-    `Profiling failed: ${error instanceof Error ? error.stack : String(error)}\n`,
-  );
+  const message = error instanceof Error ? error.stack : String(error);
+  process.stderr.write(`Profiling failed: ${message}\n`);
   process.exitCode = 1;
 });

@@ -1,74 +1,103 @@
-# Tree evaluation
+# Tree evaluation and architecture decision
 
-ArrayForge has two persistent sequence candidates: a balanced B+ tree and an RRB-style relaxed tree.
+- **Status:** Complete
+- **Primary structure:** RRB tree
+- **Default reference page:** 256 elements
 
-Both use immutable reference pages, subtree-size metadata and path copying. The benchmark adapters expose the same operations and page capacities so the candidates can be compared with the same workloads.
+ArrayForge now contains two independent persistent sequence implementations. They have separate node representations, construction paths, indexed navigation, mutation algorithms, deletion policies, iterators and structural validators.
 
-## Candidate differences
+## Candidate implementations
 
 ### B+ tree
 
-- Leaves hold reference pages.
+- Leaves hold bounded reference pages.
 - Internal nodes store cumulative subtree sizes.
-- Leaf and internal occupancy is rebalanced after point deletion and range deletion.
-- Splits keep sibling occupancy balanced.
+- Leaf and branch occupancy is kept at or above half capacity outside the root.
+- Point deletion and range deletion rebalance underfull siblings through redistribution or merging.
+- Splits preserve balanced occupancy.
 
-### RRB-style tree
+### RRB tree
 
-- Leaves hold reference pages.
-- Internal nodes store cumulative subtree sizes for indexed navigation.
-- Insertions split full pages and branches.
-- Deletions remove empty branches while retaining relaxed occupancy.
-- Existing subtrees remain shared.
+- Leaves hold bounded reference pages.
+- Internal nodes store cumulative subtree-size tables for relaxed indexed navigation.
+- Branches may have relaxed occupancy while all leaves remain at the same depth.
+- Insertions split overflowing pages and branches along the affected path.
+- Deletions remove empty nodes and collapse single-child roots without forcing sibling rebalancing.
+- Unchanged subtrees remain shared.
 
-The B+ tree keeps pages more evenly occupied after repeated deletion. The RRB-style tree does less work during deletion and range deletion.
+The implementations no longer route through a shared tree class or node representation. `PersistentTreeVector` is the shared public contract; `BPlusVector` and `RrbVector` instantiate separate engines.
 
-## Current API default
+## Architecture decision
 
-`Vector` currently maps to the RRB-style candidate. `BPlusVector` remains available through the same collection interface.
+**RRB is the primary vector implementation.** `Vector.from()` selects RRB. B+ remains available as an alternative for workloads that benefit from stricter occupancy and point-mutation behaviour.
 
-This default does not close the architecture decision. The initial benchmark results show workload-specific trade-offs, so both candidates remain available until mixed-operation, iteration and memory-retention measurements are complete.
+The decision uses the 100K, 1M and 5M benchmark comparison, structural correctness tests and controlled-GC retention profiling. RRB performs particularly well on range deletion and large-dataset reads/iteration. B+ remains competitive on point updates and mixed workloads at some sizes. Across the tested page capacities, RRB offered the stronger overall balance for the target persistent-sequence workload.
 
-The current branch factor is 32. Page capacity is selected when a vector is created.
+The detailed measurements are in [`docs/benchmarks/independent-tree-evaluation.md`](../benchmarks/independent-tree-evaluation.md), with machine-readable results in `docs/benchmarks/results/independent-tree-evaluation-node22.json`.
 
 ## Page sizing
 
-ArrayForge supports three page capacities:
+ArrayForge supports 256, 512 and 1024 element reference pages.
 
-| Capacity | Typical use                                      |
-| -------: | ------------------------------------------------ |
-|      256 | Smaller collections and mutation-heavy workloads |
-|      512 | Balanced workloads                               |
-|     1024 | Large, read-heavy collections                    |
+| Profile          | Selection                           | Intended workload                                  |
+| ---------------- | ----------------------------------- | -------------------------------------------------- |
+| `balanced`       | 256                                 | General persistent collections and mixed workloads |
+| `mutation-heavy` | 256                                 | Frequent point edits and sequence changes          |
+| `read-heavy`     | 512 below 1M elements; 1024 from 1M | Large indexed-read workloads                       |
 
-`Vector.from()` uses the balanced profile by default.
+The capacity is selected at construction and remains stable for the vector's lifetime. 512 and 1024 remain explicit tuning choices rather than the general default.
 
 ```ts
+Vector.from(values);
 Vector.from(values, { profile: 'mutation-heavy' });
-Vector.from(values, { profile: 'balanced' });
 Vector.from(values, { profile: 'read-heavy' });
+BPlusVector.from(values, { pageCapacity: 512 });
 ```
-
-The policy selects a page capacity from the initial collection length and the selected profile. The chosen capacity remains stable for that vector's lifetime.
 
 ## Complexity
 
-For a tree with branching factor B and page capacity P:
+For branching factor B and page capacity P:
 
-| Operation    | Expected cost                                          |
-| ------------ | ------------------------------------------------------ |
-| Snapshot     | O(1)                                                   |
-| Indexed read | O(log_B N)                                             |
-| Point update | O(log_B N + P)                                         |
-| Insert       | O(log_B N + P)                                         |
-| Point delete | O(log_B N + P)                                         |
-| Range delete | Visits affected boundary paths and retained tree nodes |
-| Iteration    | O(N)                                                   |
+| Operation             | Expected cost                                 |
+| --------------------- | --------------------------------------------- |
+| Snapshot              | O(1)                                          |
+| Indexed read          | O(log_B N)                                    |
+| Point update          | O(log_B N + P)                                |
+| Insert                | O(log_B N + P)                                |
+| Point delete          | O(log_B N + P)                                |
+| Range delete          | O(visited boundary paths + affected metadata) |
+| Iteration             | O(N)                                          |
+| Batched point updates | O(U log_B N + touched pages × P)              |
 
-Page cloning copies at most one reference page along the modified path for a point update. Unchanged pages and branches are shared between versions.
+`setMany()` sorts and groups updates by subtree range. Each touched leaf is copied once per batch, and each affected ancestor is rebuilt once. Unchanged pages and branches remain shared.
 
-## Implementation status
+## Transactions
 
-The current code routes both exported candidates through one `PersistentTreeVector` implementation. They share the node representation, subtree-size indexing, page construction, point-update path and iterator. The `kind` option changes deletion rebalancing: B+ mode rebalances underfull siblings, while RRB-style mode permits relaxed occupancy.
+Both callback transactions and explicit builders are implemented:
 
-The current benchmark therefore compares deletion policies over a shared tree engine, rather than two independently implemented tree structures. Point-update and iteration measurements describe that shared implementation. A structural comparison requires separate node invariants and algorithms before the primary tree can be selected.
+```ts
+const next = vector.transact((draft) => {
+  draft.set(100, valueA);
+  draft.set(200, valueB);
+  draft.insert(300, valueC);
+});
+
+const draft = vector.builder();
+draft.set(100, valueA);
+draft.set(200, valueB);
+const committed = draft.commit();
+```
+
+Pending point writes are grouped and committed through `setMany()`. Structural operations flush pending writes first, preserving call order. A callback exception leaves the source vector unchanged. Async callbacks are rejected because transaction scopes are synchronous. Builder rollback discards the unpublished working version.
+
+## Invariants
+
+Both engines expose `assertValid()` for structural verification.
+
+- Every branch's cumulative size table exactly matches its children.
+- All children of a branch have the same height/level.
+- No published node or page is mutated.
+- B+ non-root leaves and branches satisfy minimum occupancy.
+- RRB nodes satisfy fanout bounds and relaxed subtree-size metadata.
+- Empty subtrees are removed and the root is collapsed where possible.
+- Randomized edits are checked against a native-array reference model.

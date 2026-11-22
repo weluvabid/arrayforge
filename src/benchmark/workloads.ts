@@ -72,18 +72,16 @@ export function runWorkload(
     }
 
     case 'point-delete': {
+      const length = adapter.length(initial);
+      const index = Math.floor(length / 2);
+      let next = initial;
+
       for (let iteration = 0; iteration < iterations; iteration += 1) {
-        const length = adapter.length(collection);
-
-        if (length === 0) {
-          break;
-        }
-
-        const index = Math.floor(length / 2);
-        checksum += adapter.get(collection, index) ?? 0;
-        collection = adapter.delete(collection, index);
+        next = adapter.delete(initial, index);
+        checksum += adapter.get(initial, index) ?? 0;
       }
 
+      collection = next;
       break;
     }
 
@@ -97,19 +95,17 @@ export function runWorkload(
     }
 
     case 'range-delete': {
+      const length = adapter.length(initial);
+      const start = Math.floor(length / 4);
+      const end = Math.min(length, start + Math.max(1, Math.floor(options.size / 100)));
+      let next = initial;
+
       for (let iteration = 0; iteration < iterations; iteration += 1) {
-        const length = adapter.length(collection);
-        const start = Math.floor(length / 4);
-        const end = Math.min(length, start + Math.max(1, Math.floor(options.size / 100)));
-
-        if (start >= end) {
-          break;
-        }
-
-        collection = adapter.deleteRange(collection, start, end);
-        checksum += adapter.length(collection);
+        next = adapter.deleteRange(initial, start, end);
+        checksum += adapter.length(next);
       }
 
+      collection = next;
       break;
     }
 

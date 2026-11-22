@@ -1,0 +1,835 @@
+{
+  "generatedAt": "2026-11-22T06:55:55.080Z",
+  "runtime": "v22.16.0",
+  "platform": "linux-x64",
+  "results": [
+    {
+      "adapter": "bplus-256",
+      "workload": "point-delete",
+      "size": 100000,
+      "rounds": 7,
+      "iterations": 10494,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 7.347433999999993,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0007001557080236319,
+        "p95": 0.001019939489231943,
+        "p99": 0.001019939489231943
+      },
+      "operationsPerSecond": 1428253.7277640072,
+      "memoryDeltaBytes": {
+        "heapUsed": 1554892.5714285714,
+        "external": -5.714285714285714,
+        "arrayBuffers": -5.714285714285714,
+        "rss": 4587520
+      },
+      "checksum": 3673599993
+    },
+    {
+      "adapter": "bplus-256",
+      "workload": "range-delete",
+      "size": 100000,
+      "rounds": 7,
+      "iterations": 2419,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 11.421110999999996,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.00472141835469202,
+        "p95": 0.004788932203389833,
+        "p99": 0.004788932203389833
+      },
+      "operationsPerSecond": 211800.76088919904,
+      "memoryDeltaBytes": {
+        "heapUsed": -445059.4285714286,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 898779.4285714285
+      },
+      "checksum": 1677060000
+    },
+    {
+      "adapter": "rrb-256",
+      "workload": "point-delete",
+      "size": 100000,
+      "rounds": 7,
+      "iterations": 14088,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 8.360875000000021,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0005934749432140844,
+        "p95": 0.0015095953293583191,
+        "p99": 0.0015095953293583191
+      },
+      "operationsPerSecond": 1684991.104399954,
+      "memoryDeltaBytes": {
+        "heapUsed": -986238.8571428572,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 898779.4285714285
+      },
+      "checksum": 4931499993
+    },
+    {
+      "adapter": "rrb-256",
+      "workload": "range-delete",
+      "size": 100000,
+      "rounds": 7,
+      "iterations": 5000,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 9.776213999999982,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.001955242799999996,
+        "p95": 0.0024115526000000045,
+        "p99": 0.0024115526000000045
+      },
+      "operationsPerSecond": 511445.43276159966,
+      "memoryDeltaBytes": {
+        "heapUsed": -100938.28571428571,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 936228.5714285715
+      },
+      "checksum": 3465693000
+    },
+    {
+      "adapter": "bplus-512",
+      "workload": "point-delete",
+      "size": 100000,
+      "rounds": 7,
+      "iterations": 29634,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 17.89583600000003,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0006038953904299126,
+        "p95": 0.0006802755281096042,
+        "p99": 0.0006802755281096042
+      },
+      "operationsPerSecond": 1655915.9348576926,
+      "memoryDeltaBytes": {
+        "heapUsed": 591349.7142857143,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 861330.2857142857
+      },
+      "checksum": 10372599993
+    },
+    {
+      "adapter": "bplus-512",
+      "workload": "range-delete",
+      "size": 100000,
+      "rounds": 7,
+      "iterations": 5000,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 23.037635000000023,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0046075270000000045,
+        "p95": 0.004858153799999991,
+        "p99": 0.004858153799999991
+      },
+      "operationsPerSecond": 217036.1671239255,
+      "memoryDeltaBytes": {
+        "heapUsed": 1791261.7142857143,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 823881.1428571428
+      },
+      "checksum": 3465693000
+    },
+    {
+      "adapter": "rrb-512",
+      "workload": "point-delete",
+      "size": 100000,
+      "rounds": 7,
+      "iterations": 33961,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 20.02114700000004,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0005895334943022891,
+        "p95": 0.000602891316510114,
+        "p99": 0.000602891316510114
+      },
+      "operationsPerSecond": 1696256.4632286017,
+      "memoryDeltaBytes": {
+        "heapUsed": 1966600,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 842605.7142857143
+      },
+      "checksum": 11887049993
+    },
+    {
+      "adapter": "rrb-512",
+      "workload": "range-delete",
+      "size": 100000,
+      "rounds": 7,
+      "iterations": 5000,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 10.979351999999949,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0021958703999999897,
+        "p95": 0.0033692215999999915,
+        "p99": 0.0033692215999999915
+      },
+      "operationsPerSecond": 455400.2822753131,
+      "memoryDeltaBytes": {
+        "heapUsed": -8229640,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": -532480
+      },
+      "checksum": 3465693000
+    },
+    {
+      "adapter": "bplus-1024",
+      "workload": "point-delete",
+      "size": 100000,
+      "rounds": 7,
+      "iterations": 32340,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 22.772133999999824,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0007041476190476136,
+        "p95": 0.0007366026901669759,
+        "p99": 0.0007366026901669759
+      },
+      "operationsPerSecond": 1420156.7582555173,
+      "memoryDeltaBytes": {
+        "heapUsed": 938516.5714285715,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "checksum": 11319699993
+    },
+    {
+      "adapter": "bplus-1024",
+      "workload": "range-delete",
+      "size": 100000,
+      "rounds": 7,
+      "iterations": 1287,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 12.751009999999951,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.00990754467754464,
+        "p95": 0.010093933954934065,
+        "p99": 0.010093933954934065
+      },
+      "operationsPerSecond": 100933.18097938948,
+      "memoryDeltaBytes": {
+        "heapUsed": 362130.28571428574,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "checksum": 892584000
+    },
+    {
+      "adapter": "rrb-1024",
+      "workload": "point-delete",
+      "size": 100000,
+      "rounds": 7,
+      "iterations": 29905,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 23.893108999999868,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0007989670289249246,
+        "p95": 0.0009055008861394396,
+        "p99": 0.0009055008861394396
+      },
+      "operationsPerSecond": 1251616.104040716,
+      "memoryDeltaBytes": {
+        "heapUsed": -299701.71428571426,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "checksum": 10467449993
+    },
+    {
+      "adapter": "rrb-1024",
+      "workload": "range-delete",
+      "size": 100000,
+      "rounds": 7,
+      "iterations": 4801,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 25.389831999999842,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0052884465736304604,
+        "p95": 0.0056903349302228476,
+        "p99": 0.0056903349302228476
+      },
+      "operationsPerSecond": 189091.44416552383,
+      "memoryDeltaBytes": {
+        "heapUsed": 1700938.2857142857,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "checksum": 3327786000
+    },
+    {
+      "adapter": "bplus-256",
+      "workload": "point-delete",
+      "size": 1000000,
+      "rounds": 7,
+      "iterations": 29567,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 18.034966000000168,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0006099694253728875,
+        "p95": 0.0007974692731761707,
+        "p99": 0.0007974692731761707
+      },
+      "operationsPerSecond": 1639426.4341834483,
+      "memoryDeltaBytes": {
+        "heapUsed": 1401705.142857143,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 1591003.4285714286
+      },
+      "checksum": 103491499993
+    },
+    {
+      "adapter": "bplus-256",
+      "workload": "range-delete",
+      "size": 1000000,
+      "rounds": 7,
+      "iterations": 637,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 10.043939000000137,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.015767565149136794,
+        "p95": 0.036010009419152375,
+        "p99": 0.036010009419152375
+      },
+      "operationsPerSecond": 63421.33300490887,
+      "memoryDeltaBytes": {
+        "heapUsed": 4424482.285714285,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 3707465.1428571427
+      },
+      "checksum": 4421340000
+    },
+    {
+      "adapter": "rrb-256",
+      "workload": "point-delete",
+      "size": 1000000,
+      "rounds": 7,
+      "iterations": 5565,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 4.623327000000245,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0008307865229110952,
+        "p95": 0.0009247110512129432,
+        "p99": 0.0009247110512129432
+      },
+      "operationsPerSecond": 1203678.6495957791,
+      "memoryDeltaBytes": {
+        "heapUsed": 8545404.57142857,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 18724.571428571428
+      },
+      "checksum": 19484499993
+    },
+    {
+      "adapter": "rrb-256",
+      "workload": "range-delete",
+      "size": 1000000,
+      "rounds": 7,
+      "iterations": 2464,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 5.872675000000072,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.002383390827922107,
+        "p95": 0.007052480519480365,
+        "p99": 0.007052480519480365
+      },
+      "operationsPerSecond": 419570.2980328334,
+      "memoryDeltaBytes": {
+        "heapUsed": -8057972.571428572,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 142189.7142857143
+      },
+      "checksum": 17082450000
+    },
+    {
+      "adapter": "bplus-512",
+      "workload": "point-delete",
+      "size": 1000000,
+      "rounds": 7,
+      "iterations": 24044,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 18.962286999999833,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0007886494343703141,
+        "p95": 0.0008914445599733779,
+        "p99": 0.0008914445599733779
+      },
+      "operationsPerSecond": 1267990.5119039812,
+      "memoryDeltaBytes": {
+        "heapUsed": 6572800,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "checksum": 84160999993
+    },
+    {
+      "adapter": "bplus-512",
+      "workload": "range-delete",
+      "size": 1000000,
+      "rounds": 7,
+      "iterations": 1203,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 9.579437000000325,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.007962956774730112,
+        "p95": 0.01032970989193684,
+        "p99": 0.01032970989193684
+      },
+      "operationsPerSecond": 125581.49294159554,
+      "memoryDeltaBytes": {
+        "heapUsed": 8553688,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 18724.571428571428
+      },
+      "checksum": 8343720000
+    },
+    {
+      "adapter": "rrb-512",
+      "workload": "point-delete",
+      "size": 1000000,
+      "rounds": 7,
+      "iterations": 25960,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 20.820736000000124,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0008020314329738107,
+        "p95": 0.0008261630585516168,
+        "p99": 0.0008261630585516168
+      },
+      "operationsPerSecond": 1246833.9255634306,
+      "memoryDeltaBytes": {
+        "heapUsed": 7493905.142857143,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "checksum": 90866999993
+    },
+    {
+      "adapter": "rrb-512",
+      "workload": "range-delete",
+      "size": 1000000,
+      "rounds": 7,
+      "iterations": 5000,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 7.8549809999999525,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0015709961999999906,
+        "p95": 0.002503837999999996,
+        "p99": 0.002503837999999996
+      },
+      "operationsPerSecond": 636538.7771148053,
+      "memoryDeltaBytes": {
+        "heapUsed": -5715996.571428572,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": -1142198.857142857
+      },
+      "checksum": 34656930000
+    },
+    {
+      "adapter": "bplus-1024",
+      "workload": "point-delete",
+      "size": 1000000,
+      "rounds": 7,
+      "iterations": 19264,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 19.691730000000007,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0010222035921926913,
+        "p95": 0.0012963289555647968,
+        "p99": 0.0012963289555647968
+      },
+      "operationsPerSecond": 978278.698722763,
+      "memoryDeltaBytes": {
+        "heapUsed": -5919322.285714285,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": -1142198.857142857
+      },
+      "checksum": 67430999993
+    },
+    {
+      "adapter": "bplus-1024",
+      "workload": "range-delete",
+      "size": 1000000,
+      "rounds": 7,
+      "iterations": 2469,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 22.314503999999943,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.009037871202916136,
+        "p95": 0.010619268934791506,
+        "p99": 0.010619268934791506
+      },
+      "operationsPerSecond": 110645.52454314048,
+      "memoryDeltaBytes": {
+        "heapUsed": -5654149.714285715,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": -1142198.857142857
+      },
+      "checksum": 17117100000
+    },
+    {
+      "adapter": "rrb-1024",
+      "workload": "point-delete",
+      "size": 1000000,
+      "rounds": 7,
+      "iterations": 17959,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 21.550558999999794,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0011999865805445622,
+        "p95": 0.0015174840469959388,
+        "p99": 0.0015174840469959388
+      },
+      "operationsPerSecond": 833342.6525038248,
+      "memoryDeltaBytes": {
+        "heapUsed": -6700828.571428572,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": -1142198.857142857
+      },
+      "checksum": 62863499993
+    },
+    {
+      "adapter": "rrb-1024",
+      "workload": "range-delete",
+      "size": 1000000,
+      "rounds": 7,
+      "iterations": 5000,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 9.013221000000158,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0018026442000000315,
+        "p95": 0.002461291600000004,
+        "p99": 0.002461291600000004
+      },
+      "operationsPerSecond": 554740.6415531043,
+      "memoryDeltaBytes": {
+        "heapUsed": 7724249.142857143,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "checksum": 34656930000
+    },
+    {
+      "adapter": "bplus-256",
+      "workload": "point-delete",
+      "size": 5000000,
+      "rounds": 7,
+      "iterations": 14926,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 11.410503999999946,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0007644716601902684,
+        "p95": 0.0014056088034302603,
+        "p99": 0.0014056088034302603
+      },
+      "operationsPerSecond": 1308092.9641670578,
+      "memoryDeltaBytes": {
+        "heapUsed": 1624091.4285714286,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 15303241.142857144
+      },
+      "checksum": 261239999993
+    },
+    {
+      "adapter": "bplus-256",
+      "workload": "range-delete",
+      "size": 5000000,
+      "rounds": 7,
+      "iterations": 3737,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 18.913133000000016,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0050610470966015566,
+        "p95": 0.006663321648381094,
+        "p99": 0.006663321648381094
+      },
+      "operationsPerSecond": 197587.57049929257,
+      "memoryDeltaBytes": {
+        "heapUsed": 8148590.857142857,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 26916.571428571428
+      },
+      "checksum": 129521700000
+    },
+    {
+      "adapter": "rrb-256",
+      "workload": "point-delete",
+      "size": 5000000,
+      "rounds": 7,
+      "iterations": 32384,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 24.302246999999625,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.000750439939476273,
+        "p95": 0.0009762694540514001,
+        "p99": 0.0009762694540514001
+      },
+      "operationsPerSecond": 1332551.6772173578,
+      "memoryDeltaBytes": {
+        "heapUsed": 21010.285714285714,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 3462875.4285714286
+      },
+      "checksum": 566754999993
+    },
+    {
+      "adapter": "rrb-256",
+      "workload": "range-delete",
+      "size": 5000000,
+      "rounds": 7,
+      "iterations": 4571,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 15.804393999999775,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.003457535331437273,
+        "p95": 0.0035887663530955877,
+        "p99": 0.0035887663530955877
+      },
+      "operationsPerSecond": 289223.36408470105,
+      "memoryDeltaBytes": {
+        "heapUsed": 905349.7142857143,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 10532.57142857143
+      },
+      "checksum": 158419800000
+    },
+    {
+      "adapter": "bplus-512",
+      "workload": "point-delete",
+      "size": 5000000,
+      "rounds": 7,
+      "iterations": 12515,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 11.881596000000172,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0009493884139033298,
+        "p95": 0.0022097462245305663,
+        "p99": 0.0022097462245305663
+      },
+      "operationsPerSecond": 1053309.6732122367,
+      "memoryDeltaBytes": {
+        "heapUsed": 13531842.285714285,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "checksum": 219047499993
+    },
+    {
+      "adapter": "bplus-512",
+      "workload": "range-delete",
+      "size": 5000000,
+      "rounds": 7,
+      "iterations": 2150,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 20.01333599999998,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.009308528372093014,
+        "p95": 0.00982867674418611,
+        "p99": 0.00982867674418611
+      },
+      "operationsPerSecond": 107428.36676504118,
+      "memoryDeltaBytes": {
+        "heapUsed": 12242929.142857144,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "checksum": 74532150000
+    },
+    {
+      "adapter": "rrb-512",
+      "workload": "point-delete",
+      "size": 5000000,
+      "rounds": 7,
+      "iterations": 31297,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 25.892821000000367,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0008273259737355135,
+        "p95": 0.000929707128478771,
+        "p99": 0.000929707128478771
+      },
+      "operationsPerSecond": 1208713.411335117,
+      "memoryDeltaBytes": {
+        "heapUsed": 5934884.571428572,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "checksum": 547732499993
+    },
+    {
+      "adapter": "rrb-512",
+      "workload": "range-delete",
+      "size": 5000000,
+      "rounds": 7,
+      "iterations": 4047,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 20.87429599999996,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.005157967877440069,
+        "p95": 0.005866721275018613,
+        "p99": 0.005866721275018613
+      },
+      "operationsPerSecond": 193874.80181367593,
+      "memoryDeltaBytes": {
+        "heapUsed": 6852253.714285715,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "checksum": 140263200000
+    },
+    {
+      "adapter": "bplus-1024",
+      "workload": "point-delete",
+      "size": 5000000,
+      "rounds": 7,
+      "iterations": 7606,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 11.803147999999965,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0015518206678937635,
+        "p95": 0.002214245727057613,
+        "p99": 0.002214245727057613
+      },
+      "operationsPerSecond": 644404.3572104682,
+      "memoryDeltaBytes": {
+        "heapUsed": 475621.71428571426,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "checksum": 133139999993
+    },
+    {
+      "adapter": "bplus-1024",
+      "workload": "range-delete",
+      "size": 5000000,
+      "rounds": 7,
+      "iterations": 650,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 12.207979000000705,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.018781506153847237,
+        "p95": 0.020281667692308054,
+        "p99": 0.020281667692308054
+      },
+      "operationsPerSecond": 53243.86616326605,
+      "memoryDeltaBytes": {
+        "heapUsed": 12296208,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "checksum": 22557150000
+    },
+    {
+      "adapter": "rrb-1024",
+      "workload": "point-delete",
+      "size": 5000000,
+      "rounds": 7,
+      "iterations": 19520,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 25.49568100000033,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.0013061311987705088,
+        "p95": 0.0013555111168032596,
+        "p99": 0.0013555111168032596
+      },
+      "operationsPerSecond": 765619.8710675642,
+      "memoryDeltaBytes": {
+        "heapUsed": 17547556.57142857,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "checksum": 341634999993
+    },
+    {
+      "adapter": "rrb-1024",
+      "workload": "range-delete",
+      "size": 5000000,
+      "rounds": 7,
+      "iterations": 2648,
+      "targetSampleMs": 25,
+      "sampleDurationMs": 17.13905100000011,
+      "explicitGc": false,
+      "latencyMs": {
+        "p50": 0.006472451283987956,
+        "p95": 0.0074193361027191495,
+        "p99": 0.0074193361027191495
+      },
+      "operationsPerSecond": 154500.9697444732,
+      "memoryDeltaBytes": {
+        "heapUsed": -28918434.285714287,
+        "external": 0,
+        "arrayBuffers": 0,
+        "rss": 0
+      },
+      "checksum": 91787850000
+    }
+  ]
+}

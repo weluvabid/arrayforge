@@ -6,7 +6,7 @@ ArrayForge is a persistent collection engine for JavaScript and TypeScript. It i
 
 The benchmark laboratory compares native JavaScript arrays, Immer, Mutative, Immutable.js and ArrayForge's persistent tree candidates. It includes workloads for reads, updates, inserts, deletes, batch updates, range deletes, snapshots, sequential iteration and mixed operations.
 
-ArrayForge includes persistent RRB-style and balanced B+ tree candidates. `Vector` currently defaults to the RRB-style candidate while broader workload evaluation continues. Reference pages support 256, 512 and 1024 elements, with adaptive sizing profiles.
+ArrayForge includes independent persistent RRB and B+ tree engines. The evaluation selected RRB as the primary vector implementation; `Vector` defaults to RRB and `BPlusVector` remains available for mutation-oriented workloads. Balanced and mutation-heavy vectors use 256-element pages; read-heavy vectors can select 512 or 1024.
 
 The browser and command-line runners compare the available adapters and export results as JSON or CSV.
 
@@ -99,13 +99,13 @@ console.log(records.toArray()); // [10, 20, 30]
 console.log(next.toArray()); // [10, 200, 250, 30]
 ```
 
-Page sizing can be selected with `balanced`, `mutation-heavy` or `read-heavy` profiles. The B+ tree candidate remains available for benchmark comparisons.
+Page sizing can be selected with `balanced`, `mutation-heavy` or `read-heavy` profiles. The B+ tree remains available through `BPlusVector`. Transactions are available through `transact()` and `builder()`; point writes are grouped and applied with `setMany()`.
 
 ## Architecture
 
 - [Architecture specification](docs/architecture/specification.md)
-- [Tree evaluation](docs/architecture/tree-evaluation.md)
-- [Phase 2 benchmark results](docs/benchmarks/phase-2-tree-evaluation.md)
+- [Tree evaluation and decision](docs/architecture/tree-evaluation.md)
+- [Independent tree benchmark results](docs/benchmarks/independent-tree-evaluation.md)
 - [Architecture overview](docs/architecture/overview.md)
 - [Engineering roadmap](docs/roadmap.md)
 - [Architecture decisions](docs/architecture/decisions.md)
