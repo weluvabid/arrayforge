@@ -1,34 +1,94 @@
-import { nativeCopyAdapter, nativeMutableAdapter } from '../../src/adapters/native.ts';
-import { persistentTreeAdapters } from '../../src/adapters/persistent-tree.ts';
-import {
-  immerBrowserAdapter,
-  immutableBrowserAdapter,
-  mutativeBrowserAdapter,
-} from './adapters.ts';
-import { createValues } from '../../src/benchmark/random.ts';
-import { defaultIterations, prepareWorkload, runWorkload } from '../../src/benchmark/workloads.ts';
 import type {
   BenchmarkOptions,
   BenchmarkResult,
-  CollectionAdapter,
+  BenchmarkRunResult,
   WorkloadName,
 } from '../../src/benchmark/types.ts';
+import './styles/input.css';
+import { browserAdapterNames } from './adapter-names.ts';
+import { icons } from './ui/icons.ts';
+import { adapterLabel, denseRanks, rankedResults } from './ranking.ts';
 
-interface BrowserPerformance extends Performance {
-  readonly memory?: {
-    readonly usedJSHeapSize: number;
-  };
+interface WorkerStart {
+  readonly type: 'start';
+  readonly runId: number;
+  readonly total: number;
 }
 
-const sizeInput = document.querySelector<HTMLSelectElement>('#size');
-const workloadInput = document.querySelector<HTMLSelectElement>('#workload');
-const roundsInput = document.querySelector<HTMLSelectElement>('#rounds');
-const runButton = document.querySelector<HTMLButtonElement>('#run');
-const downloadButton = document.querySelector<HTMLButtonElement>('#download');
-const status = document.querySelector<HTMLElement>('#status');
-const resultsBody = document.querySelector<HTMLTableSectionElement>('#results');
+interface WorkerAdapterStart {
+  readonly type: 'adapter-start';
+  readonly runId: number;
+  readonly adapter: string;
+}
 
-let latestResults: BenchmarkResult[] = [];
+interface WorkerProgress {
+  readonly type: 'progress';
+  readonly runId: number;
+  readonly completed: number;
+  readonly total: number;
+  readonly adapter: string;
+}
+
+interface WorkerResult {
+  readonly type: 'result';
+  readonly runId: number;
+  readonly result: BenchmarkResult;
+}
+
+interface WorkerComplete {
+  readonly type: 'complete';
+  readonly runId: number;
+}
+
+interface WorkerError {
+  readonly type: 'error';
+  readonly runId: number;
+  readonly error: string;
+}
+
+type WorkerMessage =
+  WorkerStart | WorkerAdapterStart | WorkerProgress | WorkerResult | WorkerComplete | WorkerError;
+
+const sizeInput = requireElement(document.querySelector<HTMLSelectElement>('#size'), '#size');
+const workloadInput = requireElement(
+  document.querySelector<HTMLSelectElement>('#workload'),
+  '#workload',
+);
+const roundsInput = requireElement(document.querySelector<HTMLSelectElement>('#rounds'), '#rounds');
+const runButton = requireElement(document.querySelector<HTMLButtonElement>('#run'), '#run');
+const downloadButton = requireElement(
+  document.querySelector<HTMLButtonElement>('#download'),
+  '#download',
+);
+const status = requireElement(document.querySelector<HTMLElement>('#status'), '#status');
+const runtimeDot = requireElement(
+  document.querySelector<HTMLElement>('.runtime-dot'),
+  '.runtime-dot',
+);
+const resultsBody = requireElement(
+  document.querySelector<HTMLTableSectionElement>('#results'),
+  '#results',
+);
+const progress = requireElement(
+  document.querySelector<HTMLProgressElement>('#progress'),
+  '#progress',
+);
+const progressLabel = requireElement(
+  document.querySelector<HTMLElement>('#progress-label'),
+  '#progress-label',
+);
+
+let latestResults: BenchmarkRunResult[] = [];
+let activeWorker: Worker | null = null;
+let activeRunId = 0;
+let activeAdapterTimer: number | null = null;
+let activeAdapter: string | null = null;
+let currentOptions: BenchmarkOptions | null = null;
+let currentWorkload: WorkloadName | null = null;
+const adapterTimeoutMs = 2_000;
+let skippedAdapters = new Set<string>();
+let hadAdapterFailure = false;
+let hadAdapterTimeout = false;
 
 function requireElement<T extends Element>(element: T | null, selector: string): T {
   if (!element) {
@@ -38,120 +98,125 @@ function requireElement<T extends Element>(element: T | null, selector: string):
   return element;
 }
 
-function heapUsed(): number | null {
-  return (performance as BrowserPerformance).memory?.usedJSHeapSize ?? null;
+function displayLatency(value: number): string {
+  return value < 0.001 ? '< 0.001 ms' : `${value.toFixed(3)} ms`;
 }
 
-function percentile(values: readonly number[], percent: number): number {
-  const sorted = [...values].sort((left, right) => left - right);
-  const index = Math.min(sorted.length - 1, Math.ceil((percent / 100) * sorted.length) - 1);
-
-  return sorted[index] ?? 0;
-}
-
-function runAdapter(
-  adapter: CollectionAdapter,
-  workload: WorkloadName,
-  options: BenchmarkOptions,
-): BenchmarkResult {
-  const values = createValues(options.size);
-  const iterations = defaultIterations(workload, options.size);
-  const samples: number[] = [];
-  const heapDeltas: number[] = [];
-  let checksum = 0;
-  let structure: BenchmarkResult['structure'] = null;
-
-  for (let warmup = 0; warmup < options.warmup; warmup += 1) {
-    const prepared = prepareWorkload(workload, options);
-    runWorkload(adapter, workload, adapter.create(values), options, iterations, prepared);
+function displayThroughput(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 'Below timer resolution';
   }
 
-  for (let round = 0; round < options.rounds; round += 1) {
-    const prepared = prepareWorkload(workload, options);
-    const before = heapUsed();
-    let collection: unknown;
-    let run: ReturnType<typeof runWorkload>;
-    let elapsed: number;
-
-    if (workload === 'construction') {
-      const startedAt = performance.now();
-      collection = adapter.create(values);
-      elapsed = Math.max(performance.now() - startedAt, 0.000_001);
-      run = runWorkload(adapter, workload, collection, options, iterations, prepared);
-    } else {
-      collection = adapter.create(values);
-      const startedAt = performance.now();
-      run = runWorkload(adapter, workload, collection, options, iterations, prepared);
-      elapsed = Math.max(performance.now() - startedAt, 0.000_001);
-    }
-
-    structure = adapter.inspect?.(run.collection) ?? null;
-    const after = heapUsed();
-
-    samples.push(elapsed / iterations);
-    checksum +=
-      workload === 'construction' ? run.checksum : run.checksum + adapter.length(run.collection);
-
-    if (before !== null && after !== null) {
-      heapDeltas.push(after - before);
-    }
-  }
-
-  const p50 = percentile(samples, 50);
-  const p95 = percentile(samples, 95);
-  const p99 = percentile(samples, 99);
-  const averageHeap =
-    heapDeltas.length === 0
-      ? null
-      : heapDeltas.reduce((total, value) => total + value, 0) / heapDeltas.length;
-
-  return {
-    status: 'completed',
-    adapter: adapter.name,
-    workload,
-    size: options.size,
-    rounds: options.rounds,
-    iterations,
-    targetSampleMs: options.targetSampleMs ?? 0,
-    sampleDurationMs: p50 * iterations,
-    explicitGc: false,
-    latencyMs: { p50, p95, p99 },
-    operationsPerSecond: 1_000 / p50,
-    memoryDeltaBytes: {
-      heapUsed: averageHeap,
-      external: null,
-      arrayBuffers: null,
-      rss: null,
-    },
-    checksum,
-    structure,
-  };
+  return value >= 1_000_000_000 ? '1,000,000,000+' : Math.round(value).toLocaleString();
 }
 
-function renderResults(results: readonly BenchmarkResult[]): void {
-  const body = requireElement(resultsBody, '#results');
-  body.replaceChildren();
+function completedResults(results: readonly BenchmarkRunResult[]): BenchmarkResult[] {
+  return results.filter((result): result is BenchmarkResult => result.status === 'completed');
+}
+
+function clearAdapterTimer(): void {
+  if (activeAdapterTimer !== null) {
+    window.clearTimeout(activeAdapterTimer);
+  }
+
+  activeAdapterTimer = null;
+  activeAdapter = null;
+}
+
+function renderResults(results: readonly BenchmarkRunResult[]): void {
+  const completed = completedResults(results);
+  const ranked = rankedResults(completed);
+  const ranks = denseRanks(completed);
+  resultsBody.replaceChildren();
+
+  if (ranked.length === 0 && results.length === 0) {
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 6;
+    cell.className = 'px-4 py-[34px] text-center text-[var(--af-muted-foreground)]';
+    cell.textContent = 'Choose a workload and run the benchmark.';
+    row.append(cell);
+    resultsBody.append(row);
+    return;
+  }
+
+  for (const [index, result] of ranked.entries()) {
+    const row = document.createElement('tr');
+    const rank = document.createElement('td');
+    rank.className = 'w-[58px] font-mono tabular-nums text-[var(--af-muted-foreground)]';
+    rank.textContent = String(ranks.get(result.adapter) ?? index + 1).padStart(2, '0');
+    const adapter = document.createElement('td');
+    adapter.className = 'min-w-[180px] font-bold';
+    adapter.textContent = adapterLabel(result.adapter);
+    const p50 = document.createElement('td');
+    p50.className = 'text-right font-mono tabular-nums';
+    p50.textContent = displayLatency(result.latencyMs.p50);
+    const p95 = document.createElement('td');
+    p95.className = 'text-right font-mono tabular-nums';
+    p95.textContent = displayLatency(result.latencyMs.p95);
+    const p99 = document.createElement('td');
+    p99.className = 'text-right font-mono tabular-nums';
+    p99.textContent = displayLatency(result.latencyMs.p99);
+    const throughput = document.createElement('td');
+    throughput.className = 'text-right font-mono tabular-nums';
+    throughput.textContent = displayThroughput(result.operationsPerSecond);
+    row.append(rank, adapter, p50, p95, p99, throughput);
+    resultsBody.append(row);
+  }
 
   for (const result of results) {
-    const row = document.createElement('tr');
-    const values = [
-      result.adapter,
-      `${result.latencyMs.p50.toFixed(3)} ms`,
-      Math.round(result.operationsPerSecond).toLocaleString(),
-      result.memoryDeltaBytes.heapUsed === null
-        ? 'Unavailable'
-        : `${(result.memoryDeltaBytes.heapUsed / 1_048_576).toFixed(2)} MB`,
-      result.checksum.toLocaleString(),
-    ];
-
-    for (const value of values) {
-      const cell = document.createElement('td');
-      cell.textContent = value;
-      row.append(cell);
+    if (result.status !== 'timeout') {
+      continue;
     }
 
-    body.append(row);
+    const row = document.createElement('tr');
+    row.className = 'timeout-row';
+    const rank = document.createElement('td');
+    rank.className = 'w-[58px] font-mono tabular-nums text-[var(--af-muted-foreground)]';
+    rank.textContent = '—';
+    const adapter = document.createElement('td');
+    adapter.className = 'min-w-[180px] font-bold';
+    adapter.textContent = adapterLabel(result.adapter);
+    const timeoutBadge = document.createElement('span');
+    timeoutBadge.className = 'badge badge-outline badge-sm';
+    timeoutBadge.textContent = 'Timed out';
+    adapter.append(' ', timeoutBadge);
+    const detail = document.createElement('td');
+    detail.colSpan = 4;
+    detail.className = 'text-right text-sm';
+    detail.textContent = `Exceeded ${result.timeoutMs / 1_000}s adapter limit`;
+    row.append(rank, adapter, detail);
+    resultsBody.append(row);
   }
+}
+
+function setRunning(running: boolean): void {
+  downloadButton.disabled = running || latestResults.length === 0;
+  sizeInput.disabled = running;
+  workloadInput.disabled = running;
+  roundsInput.disabled = running;
+  const state = running
+    ? 'running'
+    : hadAdapterTimeout
+      ? 'failed'
+      : hadAdapterFailure
+        ? 'error'
+        : 'ready';
+  const tooltip =
+    state === 'running'
+      ? 'Running'
+      : state === 'failed'
+        ? 'Some adapters timed out'
+        : state === 'error'
+          ? 'Benchmark failed'
+          : 'Ready';
+  runtimeDot.dataset['state'] = state;
+  runtimeDot.dataset['tip'] = tooltip;
+  runtimeDot.setAttribute('aria-label', tooltip);
+  const action = running ? 'Cancel' : 'Play';
+  runButton.dataset['tip'] = action;
+  runButton.setAttribute('aria-label', action);
+  runButton.innerHTML = running ? icons.x : icons.play;
 }
 
 function downloadResults(): void {
@@ -160,7 +225,13 @@ function downloadResults(): void {
       generatedAt: new Date().toISOString(),
       userAgent: navigator.userAgent,
       hardwareConcurrency: navigator.hardwareConcurrency,
+      adapterTimeoutMs,
       results: latestResults,
+      ranking: (() => {
+        const ranked = rankedResults(completedResults(latestResults));
+        const ranks = denseRanks(ranked);
+        return ranked.map((result) => ({ rank: ranks.get(result.adapter), ...result }));
+      })(),
     },
     null,
     2,
@@ -176,56 +247,194 @@ function downloadResults(): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
-async function runBenchmarks(): Promise<void> {
-  const size = Number(requireElement(sizeInput, '#size').value);
-  const workload = requireElement(workloadInput, '#workload').value as WorkloadName;
-  const rounds = Number(requireElement(roundsInput, '#rounds').value);
-  const button = requireElement(runButton, '#run');
-  const statusElement = requireElement(status, '#status');
-  const options: BenchmarkOptions = {
-    size,
-    rounds,
-    warmup: 2,
-    seed: 42,
-  };
-  const adapters = [
-    nativeCopyAdapter,
-    nativeMutableAdapter,
-    immerBrowserAdapter,
-    mutativeBrowserAdapter,
-    immutableBrowserAdapter,
-    ...persistentTreeAdapters,
-  ];
+function finishRun(message: string, failed = false): void {
+  clearAdapterTimer();
+  activeWorker?.terminate();
+  activeWorker = null;
+  hadAdapterFailure ||= failed;
+  renderResults(latestResults);
+  progress.value = skippedAdapters.size + completedResults(latestResults).length;
+  progressLabel.textContent = `${progress.max} of ${progress.max} adapters processed`;
+  status.textContent = message;
+  setRunning(false);
+}
 
-  button.disabled = true;
-  latestResults = [];
-  requireElement(downloadButton, '#download').disabled = true;
-  statusElement.textContent = `Preparing ${size.toLocaleString()} values…`;
-  requireElement(resultsBody, '#results').replaceChildren();
+function startWorker(runId: number): void {
+  if (!currentOptions || !currentWorkload) {
+    return;
+  }
 
-  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  const options = currentOptions;
+  const workload = currentWorkload;
+  let worker: Worker;
 
   try {
-    for (const adapter of adapters) {
-      statusElement.textContent = `Running ${adapter.name}…`;
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      latestResults.push(runAdapter(adapter, workload, options));
-      renderResults(latestResults);
+    worker = new Worker(new URL('./benchmark.worker.ts', import.meta.url), { type: 'module' });
+  } catch (error) {
+    finishRun(error instanceof Error ? error.message : String(error), true);
+    return;
+  }
+
+  activeWorker = worker;
+  const completedOrSkipped = new Set([
+    ...skippedAdapters,
+    ...latestResults.map((result) => result.adapter),
+  ]);
+  const skip = [...completedOrSkipped];
+
+  worker.addEventListener('message', (event: MessageEvent<WorkerMessage>) => {
+    const message = event.data;
+
+    if (message.runId !== runId || activeWorker !== worker) {
+      return;
     }
 
-    statusElement.textContent = 'Benchmark complete.';
-    requireElement(downloadButton, '#download').disabled = false;
+    if (message.type === 'start') {
+      progress.max = message.total;
+      progress.value = skippedAdapters.size + completedResults(latestResults).length;
+      progressLabel.textContent = 'Preparing dataset…';
+      status.textContent = `Preparing ${options.size.toLocaleString()} values in the benchmark worker…`;
+      return;
+    }
+
+    if (message.type === 'adapter-start') {
+      clearAdapterTimer();
+      activeAdapter = message.adapter;
+      status.textContent = `Running ${adapterLabel(message.adapter)}…`;
+      progressLabel.textContent = `${skippedAdapters.size + completedResults(latestResults).length} of ${browserAdapterNames.length} · ${adapterLabel(message.adapter)}`;
+      activeAdapterTimer = window.setTimeout(() => {
+        if (activeWorker !== worker || activeAdapter !== message.adapter) {
+          return;
+        }
+
+        worker.terminate();
+        activeWorker = null;
+        clearAdapterTimer();
+        latestResults.push({
+          status: 'timeout',
+          adapter: message.adapter,
+          workload,
+          size: options.size,
+          timeoutMs: adapterTimeoutMs,
+        });
+        skippedAdapters.add(message.adapter);
+        hadAdapterFailure = true;
+        hadAdapterTimeout = true;
+        progress.value = skippedAdapters.size + completedResults(latestResults).length;
+        progressLabel.textContent = `${progress.value} of ${browserAdapterNames.length} · ${adapterLabel(message.adapter)} timed out`;
+        status.textContent = `${adapterLabel(message.adapter)} exceeded the 2-second limit. Continuing…`;
+        renderResults(latestResults);
+        startWorker(runId);
+      }, adapterTimeoutMs);
+      return;
+    }
+
+    if (message.type === 'progress') {
+      clearAdapterTimer();
+      progress.value = skippedAdapters.size + completedResults(latestResults).length;
+      progress.max = message.total;
+      progressLabel.textContent = `${progress.value} of ${message.total} · ${message.adapter}`;
+      status.textContent = 'Benchmarking in the background worker…';
+      return;
+    }
+
+    if (message.type === 'result') {
+      clearAdapterTimer();
+      latestResults.push(message.result);
+      renderResults(latestResults);
+      return;
+    }
+
+    if (message.type === 'complete') {
+      finishRun('Benchmark complete.');
+      return;
+    }
+
+    finishRun(message.error);
+  });
+
+  worker.addEventListener('messageerror', () => {
+    if (activeWorker !== worker) {
+      return;
+    }
+
+    finishRun('The benchmark worker returned an unreadable message.', true);
+  });
+
+  worker.addEventListener('error', (event: ErrorEvent) => {
+    if (activeWorker !== worker) {
+      return;
+    }
+
+    finishRun(event.message || 'The benchmark worker failed.', true);
+  });
+
+  worker.postMessage({
+    type: 'run',
+    runId,
+    workload: currentWorkload,
+    options: currentOptions,
+    skipAdapters: skip,
+  });
+}
+
+function runBenchmarks(): void {
+  if (activeWorker) {
+    return;
+  }
+
+  const size = Number(sizeInput.value);
+  currentWorkload = workloadInput.value as WorkloadName;
+  const rounds = Number(roundsInput.value);
+  currentOptions = { size, rounds, warmup: 2, seed: 42 };
+  skippedAdapters = new Set();
+  hadAdapterFailure = false;
+  hadAdapterTimeout = false;
+  const runId = ++activeRunId;
+
+  latestResults = [];
+  renderResults(latestResults);
+  progress.value = 0;
+  progress.max = browserAdapterNames.length;
+  progressLabel.textContent = 'Starting worker…';
+  status.textContent = `Preparing ${size.toLocaleString()} values for ${currentWorkload}.`;
+  setRunning(true);
+
+  try {
+    startWorker(runId);
   } catch (error) {
-    statusElement.textContent = error instanceof Error ? error.message : String(error);
-  } finally {
-    button.disabled = false;
+    finishRun(error instanceof Error ? error.message : String(error), true);
   }
 }
 
-requireElement(runButton, '#run').addEventListener('click', () => {
-  runBenchmarks().catch((error: unknown) => {
-    requireElement(status, '#status').textContent =
-      error instanceof Error ? error.message : String(error);
-  });
-});
-requireElement(downloadButton, '#download').addEventListener('click', downloadResults);
+function cancelBenchmarks(): void {
+  if (!activeWorker) {
+    return;
+  }
+
+  clearAdapterTimer();
+  activeWorker.terminate();
+  activeWorker = null;
+  activeRunId += 1;
+  status.textContent = 'Benchmark cancelled.';
+  progressLabel.textContent = 'Cancelled';
+  setRunning(false);
+}
+
+function handleRunButtonClick(): void {
+  if (activeWorker) {
+    cancelBenchmarks();
+    return;
+  }
+
+  runBenchmarks();
+}
+
+runButton.classList.add('tooltip', 'tooltip-bottom');
+runButton.dataset['tip'] = 'Play';
+runButton.title = 'Play';
+runButton.setAttribute('aria-label', 'Play');
+runButton.innerHTML = icons.play;
+downloadButton.innerHTML = `${icons.download}<span>Export JSON</span>`;
+runButton.addEventListener('click', handleRunButtonClick);
+downloadButton.addEventListener('click', downloadResults);

@@ -5,7 +5,6 @@ The benchmark lab compares the persistent tree implementations with several comm
 ## Adapters
 
 - `native-copy` — native arrays with a full copy for immutable updates.
-- `native-mutable` — native arrays updated in place as a mutable throughput reference.
 - `immer` — Immer `produce`.
 - `mutative` — Mutative `create`.
 - `immutable-js` — Immutable.js `List`.

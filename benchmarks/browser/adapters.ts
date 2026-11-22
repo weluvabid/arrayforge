@@ -34,6 +34,7 @@ export const immerBrowserAdapter: CollectionAdapter = {
     }),
   snapshot: (collection) => collection,
   iterate: (collection) => collection as number[],
+  forEach: (collection, callback) => (collection as number[]).forEach(callback),
 };
 
 export const mutativeBrowserAdapter: CollectionAdapter = {
@@ -66,6 +67,7 @@ export const mutativeBrowserAdapter: CollectionAdapter = {
     }),
   snapshot: (collection) => collection,
   iterate: (collection) => collection as number[],
+  forEach: (collection, callback) => (collection as number[]).forEach(callback),
 };
 
 export const immutableBrowserAdapter: CollectionAdapter = {
@@ -90,4 +92,5 @@ export const immutableBrowserAdapter: CollectionAdapter = {
     }),
   snapshot: (collection) => collection,
   iterate: (collection) => collection as ImmutableList<number>,
+  forEach: (collection, callback) => (collection as ImmutableList<number>).forEach(callback),
 };

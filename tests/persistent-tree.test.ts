@@ -151,6 +151,14 @@ for (const [name, createVector] of factories) {
   });
 }
 
+await test('default benchmark registry excludes mutable collection adapters', async () => {
+  const loaded = await loadAdapters();
+  assert.equal(
+    loaded.some((result) => result.adapter?.name === 'native-mutable'),
+    false,
+  );
+});
+
 await test('benchmark registry exposes all tree and page-capacity candidates', async () => {
   const loaded = await loadAdapters([
     'bplus-256',

@@ -1,0 +1,175 @@
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/atkinson-hyperlegible-regular.otf') format('opentype');
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../fonts/atkinson-hyperlegible-bold.otf') format('opentype');
+}
+
+:root {
+  color-scheme: light;
+  font-family: 'Atkinson Hyperlegible', Arial, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  background: #fafaf8;
+  color: #20201e;
+  --af-background: #fafaf8;
+  --af-foreground: #20201e;
+  --af-card: #ffffff;
+  --af-muted: #f1f0ec;
+  --af-muted-foreground: #6f6d67;
+  --af-border: #e8e7e1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--af-background);
+}
+
+button,
+select {
+  font: inherit;
+}
+
+.runtime-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #16a34a;
+  transition: background-color 120ms ease;
+}
+
+.runtime-dot[data-state='running'] {
+  background: #f59e0b;
+}
+
+.runtime-dot[data-state='failed'],
+.runtime-dot[data-state='error'] {
+  background: #dc2626;
+}
+
+.field .select {
+  width: 100%;
+  min-height: 44px;
+  height: 44px;
+  border-color: var(--af-border);
+  border-radius: 8px;
+  background-color: #fff;
+  color: var(--af-foreground);
+  font-size: 13px;
+  outline-offset: 2px;
+}
+
+.actions .btn,
+.export-button {
+  min-height: 44px;
+  height: 44px;
+  border-radius: 8px;
+  padding-inline: 16px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.run-button {
+  gap: 9px;
+  border-color: #242424;
+  background: #242424;
+  color: white;
+}
+
+.run-button:hover {
+  border-color: #41413e;
+  background: #41413e;
+}
+
+.execution .progress {
+  display: block;
+  width: 100%;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--af-muted);
+}
+
+.execution .progress::-webkit-progress-bar {
+  border-radius: 99px;
+  background: var(--af-muted);
+}
+
+.execution .progress::-webkit-progress-value {
+  border-radius: 99px;
+  background: #343431;
+}
+
+.execution .progress::-moz-progress-bar {
+  border-radius: 99px;
+  background: #343431;
+}
+
+.benchmark-table :where(th, td) {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--af-border);
+  font-size: 12px;
+}
+
+.benchmark-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.benchmark-table tbody tr:hover {
+  background: #fafaf8;
+}
+
+.timeout-row {
+  color: var(--color-base-content, #6f6d67);
+}
+
+.timeout-detail {
+  font-size: 0.875rem;
+  text-align: right;
+}
+
+.repository-link {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: inherit;
+  transition: color 120ms ease;
+}
+
+.repository-link:hover {
+  color: var(--af-foreground);
+}
+
+.repository-link svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+}
+
+[hidden] {
+  display: none !important;
+}

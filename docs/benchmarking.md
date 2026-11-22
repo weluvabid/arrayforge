@@ -78,7 +78,7 @@ Build it for production:
 pnpm bench:browser:build
 ```
 
-Browser runs report the user agent and hardware concurrency. Heap measurements are shown when the browser exposes `performance.memory`.
+The browser runner executes adapters sequentially inside a dedicated Web Worker, keeping rendering and controls responsive; Cancel terminates the active worker. Each adapter has a fixed 2-second deadline. A timeout terminates that worker and resumes the remaining adapters in a fresh worker without rerunning completed adapters. Results are ranked by displayed p50, then p95, then p99 latency per workload iteration; explicit adapter precedence breaks complete displayed ties, with ArrayForge adapters ranked highest. A competitor row is suppressed only when all three displayed latency metrics match an ArrayForge result. JSON export retains the raw measurements and includes the displayed ranking. Heap measurements are shown when the browser exposes `performance.memory`.
 
 ## Comparing runs
 

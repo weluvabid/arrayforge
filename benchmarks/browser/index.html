@@ -1,90 +1,238 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#111827" />
-    <title>ArrayForge browser benchmarks</title>
-    <link rel="stylesheet" href="./style.css" />
+    <meta name="theme-color" content="#fafaf8" />
+    <meta name="description" content="Run ArrayForge collection benchmarks in your browser." />
+    <title>ArrayForge — Browser benchmarks</title>
   </head>
   <body>
-    <main class="shell">
-      <header class="header">
-        <p class="eyebrow">ARRAYFORGE · BENCHMARK LAB</p>
-        <h1>Browser performance</h1>
-        <p class="intro">
-          Run the same collection workloads in your browser and compare native arrays, immutable
-          libraries and ArrayForge tree candidates.
-        </p>
+    <main
+      class="mx-auto w-[calc(100%-24px)] max-w-[1120px] py-5 sm:w-[calc(100%-32px)] sm:pt-7 max-[820px]:max-w-[680px] min-[821px]:w-[calc(100%-48px)] min-[821px]:pt-[42px]"
+    >
+      <header class="mb-[34px]">
+        <a
+          class="inline-flex items-center gap-[10px] text-[11px] font-bold tracking-[0.1em] text-inherit no-underline"
+          href="./"
+          aria-label="ArrayForge benchmark lab home"
+        >
+          <span
+            class="grid size-[27px] place-items-center rounded-[7px] border border-[#20201e] text-[14px] tracking-normal"
+            aria-hidden="true"
+            >A</span
+          >
+          <span>ARRAYFORGE</span>
+          <span class="text-[#aaa8a1]">/</span>
+          <span class="text-[var(--af-muted-foreground)] font-normal">BENCHMARK LAB</span>
+        </a>
+        <div class="mt-[34px] max-w-[720px] min-[521px]:mt-[42px] min-[821px]:mt-[54px]">
+          <p
+            class="mb-[9px] text-[10px] font-bold tracking-[0.15em] text-[var(--af-muted-foreground)]"
+          >
+            IN-BROWSER PERFORMANCE
+          </p>
+          <h1
+            class="mb-3 text-[39px] leading-[1.05] font-bold tracking-[-0.055em] sm:text-[clamp(38px,6vw,58px)]"
+          >
+            ARRAYFORGE
+          </h1>
+          <p
+            class="mb-0 max-w-[650px] text-[14px] leading-[1.65] text-[var(--af-muted-foreground)] min-[521px]:text-base"
+          >
+            A persistent collection library for TypeScript, built around B+ trees and RRB trees with
+            structural sharing for efficient immutable updates, insertions, deletions, and range
+            operations. More on
+            <a
+              class="link"
+              href="https://github.com/weluvabid/arrayforge"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="ArrayForge on GitHub"
+              title="ArrayForge on GitHub"
+            >
+              Github </a
+            >.
+          </p>
+        </div>
       </header>
 
-      <section class="controls" aria-label="Benchmark settings">
-        <label>
-          Dataset size
-          <select id="size">
-            <option value="10000">10,000</option>
-            <option value="100000" selected>100,000</option>
-            <option value="1000000">1,000,000</option>
-            <option value="5000000">5,000,000</option>
-            <option value="10000000">10,000,000</option>
-          </select>
-        </label>
-        <label>
-          Workload
-          <select id="workload">
-            <option value="construction">Construction</option>
-            <option value="point-read">Random read</option>
-            <option value="point-update" selected>Point update</option>
-            <option value="point-insert">Point insert</option>
-            <option value="point-delete">Point delete</option>
-            <option value="batch-update">Batch update (1,000 items)</option>
-            <option value="range-delete">Range delete</option>
-            <option value="snapshot">Snapshot</option>
-            <option value="sequential-iteration">Sequential iteration</option>
-            <option value="mixed-operations">Mixed operations</option>
-          </select>
-        </label>
-        <label>
-          Measured rounds
-          <select id="rounds">
-            <option value="3">3</option>
-            <option value="5" selected>5</option>
-            <option value="7">7</option>
-          </select>
-        </label>
-        <button id="run" type="button">Run benchmark</button>
+      <section
+        class="rounded-[14px] border border-[var(--af-border)] bg-[var(--af-card)] p-[17px] min-[521px]:p-6"
+        aria-labelledby="config-title"
+      >
+        <div
+          class="section-heading flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div>
+            <p
+              class="mb-[9px] text-[10px] font-bold tracking-[0.15em] text-[var(--af-muted-foreground)]"
+            >
+              CONFIGURATION
+            </p>
+            <h2
+              id="config-title"
+              class="mb-0 text-lg font-bold tracking-[-0.025em] min-[521px]:text-xl"
+            >
+              Benchmark setup
+            </h2>
+          </div>
+          <span
+            class="inline-flex items-center gap-2 text-[11px] text-[var(--af-muted-foreground)] min-[521px]:text-xs"
+          >
+            <span
+              class="runtime-dot tooltip tooltip-bottom"
+              data-tip="Ready"
+              data-state="ready"
+              role="status"
+              aria-label="Ready"
+            ></span>
+            Runs locally in your browser
+          </span>
+        </div>
+        <div
+          class="mt-[18px] grid grid-cols-1 items-end gap-3 min-[521px]:mt-6 min-[521px]:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]"
+        >
+          <label class="grid min-w-0 gap-2">
+            <span class="text-xs font-bold text-[#55534e]">Dataset size</span>
+            <select id="size" class="select select-bordered w-full">
+              <option value="10000">10,000 elements</option>
+              <option value="100000" selected>100,000 elements</option>
+              <option value="1000000">1,000,000 elements</option>
+              <option value="5000000">5,000,000 elements</option>
+              <option value="10000000">10,000,000 elements</option>
+            </select>
+          </label>
+          <label class="grid min-w-0 gap-2">
+            <span class="text-xs font-bold text-[#55534e]">Workload</span>
+            <select id="workload" class="select select-bordered w-full">
+              <option value="construction">Construction</option>
+              <option value="point-read">Random read</option>
+              <option value="point-update" selected>Point update</option>
+              <option value="point-insert">Point insert</option>
+              <option value="point-delete">Point delete</option>
+              <option value="batch-update">Batch update (1,000 items)</option>
+              <option value="range-delete">Range delete</option>
+              <option value="snapshot">Snapshot</option>
+              <option value="sequential-iteration">Sequential iteration</option>
+              <option value="sequential-visit">Sequential visit</option>
+              <option value="mixed-operations">Mixed operations</option>
+              <option value="mutation-churn">Mutation churn</option>
+            </select>
+          </label>
+          <label class="grid min-w-0 gap-2">
+            <span class="text-xs font-bold text-[#55534e]">Measured rounds</span>
+            <select id="rounds" class="select select-bordered w-full">
+              <option value="3">3 rounds</option>
+              <option value="5" selected>5 rounds</option>
+              <option value="7">7 rounds</option>
+            </select>
+          </label>
+          <div
+            class="col-span-full flex w-full gap-2 max-[820px]:col-span-full min-[821px]:col-span-1 min-[821px]:w-auto"
+          >
+            <button
+              id="run"
+              class="btn btn-neutral run-button tooltip tooltip-bottom"
+              type="button"
+            ></button>
+          </div>
+        </div>
+        <div class="mt-[23px] border-t border-[var(--af-border)] pt-[17px]" aria-live="polite">
+          <div
+            class="mb-[9px] flex flex-col items-start gap-1 text-xs text-[var(--af-muted-foreground)] min-[521px]:flex-row min-[521px]:justify-between min-[521px]:gap-3"
+          >
+            <span class="execution-status">
+              <span id="status">Ready to run.</span>
+            </span>
+            <span id="progress-label" class="tabular-nums text-[#45443f]">Waiting</span>
+          </div>
+          <progress id="progress" class="progress progress-neutral" value="0" max="1"></progress>
+        </div>
       </section>
 
-      <p id="status" class="status" role="status">Ready to run.</p>
+      <section
+        class="mt-5 rounded-[14px] border border-[var(--af-border)] bg-[var(--af-card)] p-[17px] min-[521px]:p-6"
+        aria-labelledby="results-title"
+      >
+        <div class="results-topline flex items-start justify-between gap-4">
+          <div>
+            <p
+              class="mb-[9px] text-[10px] font-bold tracking-[0.15em] text-[var(--af-muted-foreground)]"
+            >
+              RESULTS
+            </p>
+            <h2
+              id="results-title"
+              class="mb-0 text-lg font-bold tracking-[-0.025em] min-[521px]:text-xl"
+            >
+              Performance comparison
+            </h2>
+          </div>
+          <button
+            id="download"
+            class="btn btn-outline export-button"
+            type="button"
+            disabled
+          ></button>
+        </div>
 
-      <section class="results" aria-live="polite">
-        <div class="results-heading">
-          <h2>Results</h2>
-          <button id="download" class="secondary" type="button" disabled>Export JSON</button>
+        <div class="overflow-hidden rounded-[9px] border border-[var(--af-border)]">
+          <div class="overflow-x-auto">
+            <table class="table benchmark-table w-full border-collapse whitespace-nowrap">
+              <thead>
+                <tr>
+                  <th
+                    scope="col"
+                    class="border-b border-[var(--af-border)] bg-[#fafaf8] px-4 py-[14px] text-left text-[10px] font-bold tracking-[0.07em] text-[var(--af-muted-foreground)] uppercase"
+                  >
+                    Rank
+                  </th>
+                  <th
+                    scope="col"
+                    class="border-b border-[var(--af-border)] bg-[#fafaf8] px-4 py-[14px] text-left text-[10px] font-bold tracking-[0.07em] text-[var(--af-muted-foreground)] uppercase"
+                  >
+                    Implementation
+                  </th>
+                  <th
+                    scope="col"
+                    class="border-b border-[var(--af-border)] bg-[#fafaf8] px-4 py-[14px] text-right text-[10px] font-bold tracking-[0.07em] text-[var(--af-muted-foreground)] uppercase"
+                  >
+                    p50 / iteration
+                  </th>
+                  <th
+                    scope="col"
+                    class="border-b border-[var(--af-border)] bg-[#fafaf8] px-4 py-[14px] text-right text-[10px] font-bold tracking-[0.07em] text-[var(--af-muted-foreground)] uppercase"
+                  >
+                    p95 / iteration
+                  </th>
+                  <th
+                    scope="col"
+                    class="border-b border-[var(--af-border)] bg-[#fafaf8] px-4 py-[14px] text-right text-[10px] font-bold tracking-[0.07em] text-[var(--af-muted-foreground)] uppercase"
+                  >
+                    p99 / iteration
+                  </th>
+                  <th
+                    scope="col"
+                    class="border-b border-[var(--af-border)] bg-[#fafaf8] px-4 py-[14px] text-right text-[10px] font-bold tracking-[0.07em] text-[var(--af-muted-foreground)] uppercase"
+                  >
+                    Iterations / sec
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="results">
+                <tr>
+                  <td colspan="6" class="empty-cell">Choose a workload and run the benchmark.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Adapter</th>
-                <th>p50 / operation</th>
-                <th>Operations / sec</th>
-                <th>Heap change</th>
-                <th>Checksum</th>
-              </tr>
-            </thead>
-            <tbody id="results">
-              <tr>
-                <td colspan="5" class="empty">Choose a workload and run the benchmark.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <p class="mt-3 mb-0 text-[11px] text-[var(--af-muted-foreground)]">
+          Ranked by measured p50, then p95 and p99 latency. Equal results share a rank; the next
+          distinct result receives the next rank.
+        </p>
       </section>
-
-      <footer>
-        Results depend on the browser, device, available memory and background activity.
-      </footer>
     </main>
     <script type="module" src="./main.ts"></script>
   </body>
