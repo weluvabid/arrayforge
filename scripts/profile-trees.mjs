@@ -96,7 +96,7 @@ function flattenProfile(profile) {
 }
 
 function createVector(kind, values) {
-  const options = { pageCapacity: 256 };
+  const options = { pageSize: 256 };
   return kind === 'bplus' ? BPlusVector.from(values, options) : RrbVector.from(values, options);
 }
 
@@ -324,7 +324,7 @@ async function main() {
         platform: `${process.platform}-${process.arch}`,
         configuration: {
           size: SIZE,
-          pageCapacity: 256,
+          pageSize: 256,
           updates: UPDATES,
           retainedSnapshots: SNAPSHOTS,
           samplingIntervalBytes: SAMPLE_INTERVAL,

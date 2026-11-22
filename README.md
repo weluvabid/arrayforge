@@ -1,114 +1,110 @@
 # ArrayForge
 
-ArrayForge is a persistent collection engine for JavaScript and TypeScript. It is designed for applications that work with large datasets and need efficient updates, snapshots and history.
+Persistent vectors for large JavaScript and TypeScript datasets.
 
-## Current work
+ArrayForge keeps earlier versions of a collection available while you create updated ones. A point update copies only the affected page and the tree nodes along its path. Snapshots share the unchanged structure, so taking a snapshot is constant-time.
 
-The benchmark laboratory compares native JavaScript arrays, Immer, Mutative, Immutable.js and ArrayForge's persistent tree candidates. It includes workloads for reads, updates, inserts, deletes, batch updates, range deletes, snapshots, sequential iteration and mixed operations.
-
-ArrayForge includes independent persistent RRB and B+ tree engines. The evaluation selected RRB as the primary vector implementation; `Vector` defaults to RRB and `BPlusVector` remains available for mutation-oriented workloads. Balanced and mutation-heavy vectors use 256-element pages; read-heavy vectors can select 512 or 1024.
-
-The browser and command-line runners compare the available adapters and export results as JSON or CSV.
-
-## Requirements
-
-- Node.js 26.13.0
-- pnpm 12
-
-Install the project dependencies:
+## Install
 
 ```sh
-pnpm install
+pnpm add arrayforge
 ```
 
-## Run the benchmark lab
-
-Run a quick local suite:
-
-```sh
-pnpm bench:smoke
-```
-
-Run the default suite:
-
-```sh
-pnpm bench
-```
-
-Compare the tree candidates:
-
-```sh
-pnpm bench:trees
-pnpm bench:trees:large
-```
-
-Choose dataset sizes, adapters and workloads:
-
-```sh
-pnpm bench -- --sizes 100000,1000000 --adapter native-copy,immer --workload point-update,batch-update
-```
-
-Save a machine-readable report:
-
-```sh
-pnpm bench -- --sizes 100000,1000000 --format json --output reports/baseline.json
-pnpm bench -- --sizes 100000,1000000 --format csv --output reports/baseline.csv
-```
-
-The runner records runtime and platform information in JSON reports. Use the same machine, Node.js version, dataset sizes and benchmark options when comparing runs.
-
-## Browser benchmarks
-
-Start the browser runner:
-
-```sh
-pnpm bench:browser
-```
-
-Open [http://127.0.0.1:4173](http://127.0.0.1:4173), choose a dataset and workload, then run the comparison. The page compares native arrays, Immer, Mutative, Immutable.js and the B+ and RRB-style tree candidates in the same browser runtime. Chromium may expose heap measurements through `performance.memory`; other browsers may leave that field unavailable.
-
-Build the browser runner:
-
-```sh
-pnpm bench:browser:build
-```
-
-## Development
-
-```sh
-pnpm check
-pnpm bench:smoke
-```
-
-`pnpm check` runs formatting, linting, TypeScript checks and tests. Git hooks can be installed with:
-
-```sh
-sh scripts/install-hooks.sh
-```
-
-## Persistent vectors
+## Quick start
 
 ```ts
-import { Vector } from './src/index.ts';
+import { Vector } from 'arrayforge';
 
-const records = Vector.from([10, 20, 30]);
-const updated = records.set(1, 200);
-const next = updated.insert(2, 250);
+const users = Vector.from([
+  { id: 1, name: 'Ada' },
+  { id: 2, name: 'Grace' },
+]);
 
-console.log(records.toArray()); // [10, 20, 30]
-console.log(next.toArray()); // [10, 200, 250, 30]
+const nextUsers = users.set(1, { id: 2, name: 'Grace Hopper' });
+
+console.log(users.get(1)?.name); // Grace
+console.log(nextUsers.get(1)?.name); // Grace Hopper
 ```
 
-Page sizing can be selected with `balanced`, `mutation-heavy` or `read-heavy` profiles. The B+ tree remains available through `BPlusVector`. Transactions are available through `transact()` and `builder()`; point writes are grouped and applied with `setMany()`.
+`users` stays unchanged. Both versions share the parts of the tree that the update did not touch.
 
-## Architecture
+## Choose a tree
 
-- [Architecture specification](docs/architecture/specification.md)
-- [Tree evaluation and decision](docs/architecture/tree-evaluation.md)
-- [Independent tree benchmark results](docs/benchmarks/independent-tree-evaluation.md)
-- [Architecture overview](docs/architecture/overview.md)
-- [Engineering roadmap](docs/roadmap.md)
-- [Architecture decisions](docs/architecture/decisions.md)
-- [Benchmark methodology](docs/benchmarks/methodology.md)
-- [Iteration optimization](docs/benchmarks/iteration-optimization.md)
-- [Initial benchmark run](docs/benchmarks/initial-run.md)
+`Vector.from()` chooses an implementation from the workload profile. The default profile is balanced.
+
+```ts
+import { PROFILE, Vector } from 'arrayforge';
+
+const general = Vector.from(data);
+const batchWork = Vector.from(data, { profile: PROFILE.BATCH_HEAVY });
+const readWork = Vector.from(data, { profile: PROFILE.READ_HEAVY });
+```
+
+You can also choose the implementation directly:
+
+```ts
+import { BPlusVector, RRBVector } from 'arrayforge';
+
+const indexedEdits = BPlusVector.from(data);
+const batchEdits = RRBVector.from(data);
+```
+
+B+ and RRB vectors expose the same collection operations. Use the implementation that matches the work your application performs, or let `Vector` choose from a profile.
+
+## Change the implementation later
+
+A collection can be rebuilt into the other tree without first converting the whole collection into a JavaScript array.
+
+```ts
+import { TREE } from 'arrayforge';
+
+const rrb = general.convertTo(TREE.RRB);
+const bplus = rrb.toBPlus();
+```
+
+`toRRB()` and `toBPlus()` are the dedicated alternatives. The original collection and its snapshots remain unchanged.
+
+## Work with immutable versions
+
+```ts
+const updated = general.set(10, replacement).insert(20, newItem).deleteRange(40, 50);
+
+const window = updated.slice(10, 30);
+const expanded = updated.concat(otherItems);
+const replaced = updated.splice(5, 2, first, second);
+```
+
+For a group of related writes, use a transaction:
+
+```ts
+const next = general.transact((draft) => {
+  draft.set(10, replacement);
+  draft.set(20, anotherReplacement);
+  draft.insert(30, newItem);
+});
+```
+
+Transactions are synchronous. If the callback throws, the original collection remains unchanged.
+
+## Page sizes
+
+Use the exported constants for the built-in page sizes:
+
+```ts
+import { PAGE_SIZE, TREE, Vector } from 'arrayforge';
+
+const compact = Vector.from(data, {
+  tree: TREE.B_PLUS,
+  pageSize: PAGE_SIZE.SMALL,
+});
+```
+
+The available sizes are `PAGE_SIZE.SMALL` (256), `PAGE_SIZE.MEDIUM` (512), and `PAGE_SIZE.LARGE` (1024). A custom numeric page size is also accepted.
+
+## Learn more
+
+- [API reference](docs/api.md)
+- [Performance results](docs/performance.md)
+- [Benchmarking guide](docs/benchmarking.md)
+
+ArrayForge is released under the MIT license.

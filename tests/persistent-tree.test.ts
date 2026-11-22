@@ -3,21 +3,26 @@ import test from 'node:test';
 import {
   BPlusVector,
   RrbVector,
+  PAGE_SIZE,
+  PROFILE,
+  RRBVector,
+  TREE,
   Vector,
   selectPageCapacity,
   type PersistentTreeVector,
 } from '../src/persistent/tree.ts';
+import type {
+  BPlusVector as BPlusVectorType,
+  RRBVector as RRBVectorType,
+} from '../src/persistent/tree.ts';
 import { createRandom } from '../src/benchmark/random.ts';
 import { loadAdapters } from '../src/benchmark/adapters.ts';
 
-type VectorFactory = (
-  values: readonly number[],
-  pageCapacity: number,
-) => PersistentTreeVector<number>;
+type VectorFactory = (values: readonly number[], pageSize: number) => PersistentTreeVector<number>;
 
 const factories: readonly [string, VectorFactory][] = [
-  ['B+ tree', (values, pageCapacity) => BPlusVector.from(values, { pageCapacity })],
-  ['RRB tree', (values, pageCapacity) => RrbVector.from(values, { pageCapacity })],
+  ['B+ tree', (values, pageSize) => BPlusVector.from(values, { pageSize })],
+  ['RRB tree', (values, pageSize) => RrbVector.from(values, { pageSize })],
 ];
 
 for (const [name, createVector] of factories) {
@@ -106,7 +111,7 @@ await test('tree candidates retain earlier versions after repeated edits', () =>
   const first = BPlusVector.from(
     Array.from({ length: 1_000 }, (_, index) => index),
     {
-      pageCapacity: 32,
+      pageSize: 32,
     },
   );
   const second = first.set(400, -1);
@@ -122,10 +127,13 @@ await test('tree candidates retain earlier versions after repeated edits', () =>
 await test('adaptive page capacity follows the selected workload profile', () => {
   assert.equal(selectPageCapacity(10_000), 256);
   assert.equal(selectPageCapacity(1_000_000), 256);
-  assert.equal(selectPageCapacity(1_000_000, 'mutation-heavy'), 256);
-  assert.equal(selectPageCapacity(1_000_000, 'read-heavy'), 1024);
-  assert.equal(Vector.from([1, 2, 3]).kind, 'rrb');
-  assert.equal(Vector.from([1, 2, 3]).pageCapacity, 256);
+  assert.equal(selectPageCapacity(1_000_000, PROFILE.MUTATION_HEAVY), PAGE_SIZE.SMALL);
+  assert.equal(selectPageCapacity(1_000_000, PROFILE.BATCH_HEAVY), PAGE_SIZE.SMALL);
+  assert.equal(selectPageCapacity(999_999, PROFILE.READ_HEAVY), PAGE_SIZE.MEDIUM);
+  assert.equal(selectPageCapacity(1_000_000, PROFILE.READ_HEAVY), PAGE_SIZE.LARGE);
+  assert.equal(Vector.from([1, 2, 3]).kind, 'bplus');
+  assert.equal(Vector.from([1, 2, 3]).pageSize, PAGE_SIZE.SMALL);
+  assert.equal(Vector.from([1, 2, 3], { profile: PROFILE.BATCH_HEAVY }).kind, 'rrb');
 });
 
 for (const [name, createVector] of factories) {
@@ -254,11 +262,11 @@ for (const [name, createVector] of factories) {
 for (const [name, factory] of [
   [
     'B+ tree',
-    (values: readonly number[]) => BPlusVector.from(values, { pageCapacity: 8, branchFactor: 4 }),
+    (values: readonly number[]) => BPlusVector.from(values, { pageSize: 8, branchFactor: 4 }),
   ],
   [
     'RRB tree',
-    (values: readonly number[]) => RrbVector.from(values, { pageCapacity: 8, branchFactor: 4 }),
+    (values: readonly number[]) => RrbVector.from(values, { pageSize: 8, branchFactor: 4 }),
   ],
 ] as const) {
   await test(`${name} maintains multi-level invariants under sustained edits`, () => {
@@ -286,3 +294,109 @@ for (const [name, factory] of [
     assert.deepEqual(actual.toArray(), expected);
   });
 }
+
+for (const [name, createVector] of factories) {
+  await test(`${name} supports immutable slice, splice and concat`, () => {
+    const original = createVector([0, 1, 2, 3, 4, 5], 4);
+    const sliced = original.slice(1, -1);
+    const spliced = original.splice(2, 2, 20, 30);
+    const concatenated = original.concat([6, 7]);
+    const generated = original.concat(
+      (function* () {
+        yield 6;
+        yield 7;
+      })(),
+    );
+
+    assert.deepEqual(sliced.toArray(), [1, 2, 3, 4]);
+    assert.deepEqual(spliced.toArray(), [0, 1, 20, 30, 4, 5]);
+    assert.deepEqual(concatenated.toArray(), [0, 1, 2, 3, 4, 5, 6, 7]);
+    assert.deepEqual(generated.toArray(), [0, 1, 2, 3, 4, 5, 6, 7]);
+    assert.equal(original.slice(), original);
+    assert.deepEqual(original.toArray(), [0, 1, 2, 3, 4, 5]);
+    sliced.assertValid();
+    spliced.assertValid();
+    concatenated.assertValid();
+  });
+
+  await test(`${name} converts between tree structures without changing values`, () => {
+    const original = createVector(
+      Array.from({ length: 2_500 }, (_, index) => index),
+      32,
+    );
+    const converted = original.convertTo(original.kind === 'bplus' ? TREE.RRB : TREE.B_PLUS);
+    const dedicated = original.kind === 'bplus' ? original.toRRB() : original.toBPlus();
+
+    assert.equal(converted.kind, original.kind === 'bplus' ? 'rrb' : 'bplus');
+    assert.deepEqual(converted.toArray(), original.toArray());
+    assert.deepEqual(dedicated.toArray(), original.toArray());
+    assert.equal(original.length, 2_500);
+    converted.assertValid();
+    dedicated.assertValid();
+  });
+}
+
+await test('Vector factory honours explicit tree selection and workload profiles', () => {
+  assert.equal(Object.isFrozen(PROFILE), true);
+  assert.equal(Object.isFrozen(TREE), true);
+  assert.equal(Object.isFrozen(PAGE_SIZE), true);
+  assert.equal(Vector.from([1, 2], { tree: TREE.B_PLUS }).kind, 'bplus');
+  assert.equal(Vector.from([1, 2], { tree: TREE.RRB }).kind, 'rrb');
+  assert.equal(Vector.from([1, 2], { tree: TREE.AUTO, profile: PROFILE.BATCH_HEAVY }).kind, 'rrb');
+  assert.equal(Vector.from([1, 2], { tree: TREE.RRB, profile: PROFILE.BALANCED }).kind, 'rrb');
+  assert.equal(
+    Vector.from([1, 2], { tree: TREE.B_PLUS, profile: PROFILE.BATCH_HEAVY }).kind,
+    'bplus',
+  );
+  assert.equal(RRBVector.from([1, 2]).kind, 'rrb');
+  assert.throws(() => Vector.from([1], { profile: 'unknown' as never }), TypeError);
+  assert.throws(() => Vector.from([1], { tree: 'unknown' as never }), TypeError);
+  assert.throws(() => BPlusVector.from([1]).convertTo('auto' as never), TypeError);
+});
+
+await test('profile changes rebuild for the requested workload and preserve the source', () => {
+  const original = Vector.from([1, 2, 3, 4]);
+  const batch = original.withProfile(PROFILE.BATCH_HEAVY);
+  const read = batch.withProfile(PROFILE.READ_HEAVY);
+
+  assert.equal(original.kind, 'bplus');
+  assert.equal(batch.kind, 'rrb');
+  assert.equal(read.kind, 'bplus');
+  assert.deepEqual(batch.toArray(), original.toArray());
+  assert.deepEqual(read.toArray(), original.toArray());
+});
+
+await test('persistent tree adapters apply batch writes through the collection API', async () => {
+  const loaded = await loadAdapters(['bplus-256', 'rrb-256']);
+  const values = Array.from({ length: 100 }, (_, index) => index);
+
+  for (const result of loaded) {
+    const adapter = result.adapter;
+
+    assert.ok(adapter);
+
+    const original = adapter.create(values);
+    const updated = adapter.updateMany(original, [
+      { index: 10, value: -10 },
+      { index: 20, value: -20 },
+      { index: 90, value: -90 },
+    ]);
+
+    assert.equal(adapter.get(updated, 10), -10);
+    assert.equal(adapter.get(updated, 20), -20);
+    assert.equal(adapter.get(updated, 90), -90);
+    assert.equal(adapter.get(original, 10), 10);
+  }
+});
+
+await test('dedicated constructors and conversion methods retain concrete tree types', () => {
+  const bplus: BPlusVectorType<number> = BPlusVector.from([1, 2, 3]);
+  const rrb: RRBVectorType<number> = bplus.toRRB();
+  const convertedByFactory: RRBVectorType<number> = bplus.convertTo(TREE.RRB);
+  const convertedBack: BPlusVectorType<number> = rrb.toBPlus();
+
+  assert.equal(bplus.kind, TREE.B_PLUS);
+  assert.equal(rrb.kind, TREE.RRB);
+  assert.equal(convertedByFactory.kind, TREE.RRB);
+  assert.equal(convertedBack.kind, TREE.B_PLUS);
+});

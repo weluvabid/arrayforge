@@ -1,61 +1,56 @@
-import { BPlusVector, RrbVector, type TreeOptions } from '../persistent/tree.ts';
+import {
+  BPlusVector,
+  RrbVector,
+  type PersistentTreeVector,
+  type TreeOptions,
+} from '../persistent/tree.ts';
 import type { CollectionAdapter } from '../benchmark/types.ts';
 
 function createAdapter(
   name: string,
   description: string,
-  create: (values: readonly number[]) => ReturnType<typeof BPlusVector.from<number>>,
+  create: (values: readonly number[]) => PersistentTreeVector<number>,
 ): CollectionAdapter {
   return {
     name,
     description,
     create: (values) => create(values),
-    length: (collection) => (collection as ReturnType<typeof BPlusVector.from<number>>).length,
-    get: (collection, index) =>
-      (collection as ReturnType<typeof BPlusVector.from<number>>).get(index),
+    length: (collection) => (collection as PersistentTreeVector<number>).length,
+    get: (collection, index) => (collection as PersistentTreeVector<number>).get(index),
     set: (collection, index, value) =>
-      (collection as ReturnType<typeof BPlusVector.from<number>>).set(index, value),
+      (collection as PersistentTreeVector<number>).set(index, value),
     insert: (collection, index, value) =>
-      (collection as ReturnType<typeof BPlusVector.from<number>>).insert(index, value),
-    delete: (collection, index) =>
-      (collection as ReturnType<typeof BPlusVector.from<number>>).delete(index),
+      (collection as PersistentTreeVector<number>).insert(index, value),
+    delete: (collection, index) => (collection as PersistentTreeVector<number>).delete(index),
     deleteRange: (collection, start, end) =>
-      (collection as ReturnType<typeof BPlusVector.from<number>>).deleteRange(start, end),
-    updateMany: (collection, changes) => {
-      let next = collection as ReturnType<typeof BPlusVector.from<number>>;
-
-      for (const change of changes) {
-        next = next.set(change.index, change.value);
-      }
-
-      return next;
-    },
-    snapshot: (collection) =>
-      (collection as ReturnType<typeof BPlusVector.from<number>>).snapshot(),
+      (collection as PersistentTreeVector<number>).deleteRange(start, end),
+    updateMany: (collection, changes) =>
+      (collection as PersistentTreeVector<number>).setMany(changes),
+    snapshot: (collection) => (collection as PersistentTreeVector<number>).snapshot(),
     iterate: (collection) => collection as Iterable<number>,
   };
 }
 
 export function createPersistentTreeAdapters(options: TreeOptions = {}): CollectionAdapter[] {
-  const pageCapacity = options.pageCapacity ?? 512;
-  const configuredOptions = { ...options, pageCapacity };
+  const pageSize = options.pageSize ?? 512;
+  const configuredOptions = { ...options, pageSize };
 
   return [
     createAdapter(
-      `bplus-${pageCapacity}`,
-      `Persistent B+ tree with ${pageCapacity}-element reference pages.`,
+      `bplus-${pageSize}`,
+      `Persistent B+ tree with ${pageSize}-element reference pages.`,
       (values) => BPlusVector.from(values, configuredOptions),
     ),
     createAdapter(
-      `rrb-${pageCapacity}`,
-      `Relaxed radix-balanced tree with ${pageCapacity}-element reference pages.`,
+      `rrb-${pageSize}`,
+      `Relaxed radix-balanced tree with ${pageSize}-element reference pages.`,
       (values) => RrbVector.from(values, configuredOptions),
     ),
   ];
 }
 
 export const persistentTreeAdapters = [
-  ...createPersistentTreeAdapters({ pageCapacity: 256 }),
-  ...createPersistentTreeAdapters({ pageCapacity: 512 }),
-  ...createPersistentTreeAdapters({ pageCapacity: 1024 }),
+  ...createPersistentTreeAdapters({ pageSize: 256 }),
+  ...createPersistentTreeAdapters({ pageSize: 512 }),
+  ...createPersistentTreeAdapters({ pageSize: 1024 }),
 ];

@@ -1,5 +1,92 @@
-import { RrbVector } from './rrb.ts';
-export type TreeKind = 'bplus' | 'rrb';
+import { RrbVector, createRrbFromIterable } from './rrb.ts';
+
+export const PROFILE = Object.freeze({
+  BALANCED: 'balanced',
+  READ_HEAVY: 'read-heavy',
+  MUTATION_HEAVY: 'mutation-heavy',
+  BATCH_HEAVY: 'batch-heavy',
+} as const);
+
+export const TREE = Object.freeze({
+  AUTO: 'auto',
+  B_PLUS: 'bplus',
+  RRB: 'rrb',
+} as const);
+
+export const PAGE_SIZE = Object.freeze({
+  SMALL: 256,
+  MEDIUM: 512,
+  LARGE: 1024,
+} as const);
+
+export type TreeKind = typeof TREE.B_PLUS | typeof TREE.RRB;
+export type TreeSelection = TreeKind | typeof TREE.AUTO;
+export type Profile = (typeof PROFILE)[keyof typeof PROFILE];
+export type PageProfile = Profile;
+export type PageSize = (typeof PAGE_SIZE)[keyof typeof PAGE_SIZE] | number;
+
+export interface TreeOptions {
+  readonly pageSize?: PageSize;
+  readonly profile?: PageProfile;
+  readonly branchFactor?: number;
+}
+
+export interface VectorOptions extends TreeOptions {
+  readonly tree?: TreeSelection;
+}
+
+export function assertValidProfile(profile: PageProfile | undefined): void {
+  if (
+    profile !== undefined &&
+    profile !== PROFILE.BALANCED &&
+    profile !== PROFILE.READ_HEAVY &&
+    profile !== PROFILE.MUTATION_HEAVY &&
+    profile !== PROFILE.BATCH_HEAVY
+  ) {
+    throw new TypeError(`Unknown workload profile: ${String(profile)}.`);
+  }
+}
+
+export function selectPageCapacity(
+  length: number,
+  profile: PageProfile = PROFILE.BALANCED,
+): number {
+  assertValidProfile(profile);
+
+  if (!Number.isSafeInteger(length) || length < 0) {
+    throw new RangeError('Collection length must be a non-negative safe integer.');
+  }
+
+  if (profile === PROFILE.READ_HEAVY) {
+    return length >= 1_000_000 ? PAGE_SIZE.LARGE : PAGE_SIZE.MEDIUM;
+  }
+
+  return PAGE_SIZE.SMALL;
+}
+
+function resolvePageCapacity(options: TreeOptions, length: number): number {
+  assertValidProfile(options.profile);
+
+  const capacity = options.pageSize ?? selectPageCapacity(length, options.profile);
+
+  validateCapacity(capacity, 'pageSize');
+
+  return capacity;
+}
+
+function normalizeSliceIndex(index: number, length: number): number {
+  if (Number.isNaN(index)) {
+    return 0;
+  }
+
+  if (!Number.isFinite(index)) {
+    return index < 0 ? 0 : length;
+  }
+
+  const integer = Math.trunc(index);
+
+  return integer < 0 ? Math.max(length + integer, 0) : Math.min(integer, length);
+}
 
 function consumeThenable(value: object): void {
   const then = (value as { then?: unknown }).then;
@@ -12,30 +99,6 @@ function consumeThenable(value: object): void {
       ) => unknown
     ).call(value, undefined, () => undefined);
   }
-}
-
-export type PageProfile = 'balanced' | 'mutation-heavy' | 'read-heavy';
-
-export interface TreeOptions {
-  readonly pageCapacity?: number | 'adaptive';
-  readonly profile?: PageProfile;
-  readonly branchFactor?: number;
-}
-
-export function selectPageCapacity(length: number, profile: PageProfile = 'balanced'): number {
-  if (!Number.isSafeInteger(length) || length < 0) {
-    throw new RangeError('Collection length must be a non-negative safe integer.');
-  }
-
-  if (profile === 'mutation-heavy') {
-    return 256;
-  }
-
-  if (profile === 'read-heavy') {
-    return length >= 1_000_000 ? 1024 : 512;
-  }
-
-  return 256;
 }
 
 interface LeafNode<T> {
@@ -160,6 +223,103 @@ function buildTree<T>(
   }
 
   return level[0] ?? leaf([]);
+}
+
+function buildTreeFromIterable<T>(
+  values: Iterable<T>,
+  pageCapacity: number,
+  branchFactor: number,
+): TreeNode<T> {
+  const pages: T[][] = [];
+  let page: T[] = [];
+
+  for (const value of values) {
+    page.push(value);
+
+    if (page.length === pageCapacity) {
+      pages.push(page);
+      page = [];
+    }
+  }
+
+  if (page.length > 0 || pages.length === 0) {
+    pages.push(page);
+  }
+
+  const last = pages[pages.length - 1];
+  const previous = pages[pages.length - 2];
+
+  if (last && previous && last.length < Math.ceil(pageCapacity / 2)) {
+    const combined = [...previous, ...last];
+    const midpoint = Math.ceil(combined.length / 2);
+    pages.splice(pages.length - 2, 2, combined.slice(0, midpoint), combined.slice(midpoint));
+  }
+
+  let level: TreeNode<T>[] = pages.map((items) => leaf(items));
+
+  while (level.length > branchFactor) {
+    const groupCount = Math.ceil(level.length / branchFactor);
+    const baseGroupLength = Math.floor(level.length / groupCount);
+    const extraGroups = level.length % groupCount;
+    const next: TreeNode<T>[] = [];
+    let offset = 0;
+
+    for (let index = 0; index < groupCount; index += 1) {
+      const count = baseGroupLength + (index < extraGroups ? 1 : 0);
+      next.push(branch(level.slice(offset, offset + count)));
+      offset += count;
+    }
+
+    level = next;
+  }
+
+  return level.length === 1 ? (level[0] as TreeNode<T>) : branch(level);
+}
+
+function* sliceValues<T>(values: Iterable<T>, start: number, end: number): IterableIterator<T> {
+  let index = 0;
+
+  for (const value of values) {
+    if (index >= end) {
+      return;
+    }
+
+    if (index >= start) {
+      yield value;
+    }
+
+    index += 1;
+  }
+}
+
+function* spliceValues<T>(
+  values: Iterable<T>,
+  start: number,
+  end: number,
+  inserted: readonly T[],
+): IterableIterator<T> {
+  let index = 0;
+
+  for (const value of values) {
+    if (index === start) {
+      yield* inserted;
+    }
+
+    if (index < start || index >= end) {
+      yield value;
+    }
+
+    index += 1;
+  }
+
+  if (start === index) {
+    yield* inserted;
+  }
+}
+
+function* concatValues<T>(values: Iterable<T>, other: Iterable<T>): IterableIterator<T> {
+  yield* values;
+  yield* other;
 }
 
 function getNode<T>(root: TreeNode<T>, index: number): T | undefined {
@@ -636,7 +796,7 @@ export interface PersistentTreeVector<T> extends Iterable<T> {
   [Symbol.iterator](): IterableIterator<T>;
   readonly length: number;
   readonly kind: TreeKind;
-  readonly pageCapacity: number;
+  readonly pageSize: number;
   get(index: number): T | undefined;
   set(index: number, value: T): PersistentTreeVector<T>;
   setMany(
@@ -645,6 +805,15 @@ export interface PersistentTreeVector<T> extends Iterable<T> {
   insert(index: number, value: T): PersistentTreeVector<T>;
   delete(index: number): PersistentTreeVector<T>;
   deleteRange(start: number, end: number): PersistentTreeVector<T>;
+  slice(start?: number, end?: number): PersistentTreeVector<T>;
+  splice(start: number, deleteCount: number, ...items: T[]): PersistentTreeVector<T>;
+  concat(other: Iterable<T>): PersistentTreeVector<T>;
+  convertTo(tree: typeof TREE.B_PLUS, options?: TreeOptions): BPlusVector<T>;
+  convertTo(tree: typeof TREE.RRB, options?: TreeOptions): RRBVector<T>;
+  convertTo(tree: TreeKind, options?: TreeOptions): PersistentTreeVector<T>;
+  toBPlus(options?: TreeOptions): BPlusVector<T>;
+  toRRB(options?: TreeOptions): RRBVector<T>;
+  withProfile(profile: PageProfile): PersistentTreeVector<T>;
   snapshot(): PersistentTreeVector<T>;
   toArray(): T[];
   builder(): VectorBuilder<T>;
@@ -664,17 +833,31 @@ export class BPlusVectorImpl<T> implements PersistentTreeVector<T> {
   }
 
   static from<T>(values: readonly T[], options: TreeOptions = {}): BPlusVectorImpl<T> {
-    const pageCapacity =
-      options.pageCapacity === undefined || options.pageCapacity === 'adaptive'
-        ? selectPageCapacity(values.length, options.profile)
-        : options.pageCapacity;
+    const pageCapacity = resolvePageCapacity(options, values.length);
     const branchFactor = options.branchFactor ?? DEFAULT_BRANCH_FACTOR;
 
-    validateCapacity(pageCapacity, 'pageCapacity');
+    validateCapacity(pageCapacity, 'pageSize');
     validateCapacity(branchFactor, 'branchFactor');
 
     return new BPlusVectorImpl(
       buildTree(values, pageCapacity, branchFactor),
+      pageCapacity,
+      branchFactor,
+    );
+  }
+
+  static fromIterable<T>(
+    values: Iterable<T>,
+    options: TreeOptions,
+    length: number,
+  ): BPlusVectorImpl<T> {
+    const pageCapacity = resolvePageCapacity(options, length);
+    const branchFactor = options.branchFactor ?? DEFAULT_BRANCH_FACTOR;
+
+    validateCapacity(branchFactor, 'branchFactor');
+
+    return new BPlusVectorImpl(
+      buildTreeFromIterable(values, pageCapacity, branchFactor),
       pageCapacity,
       branchFactor,
     );
@@ -688,11 +871,11 @@ export class BPlusVectorImpl<T> implements PersistentTreeVector<T> {
     return this.#root.length;
   }
 
-  get kind(): 'bplus' {
-    return 'bplus';
+  get kind(): typeof TREE.B_PLUS {
+    return TREE.B_PLUS;
   }
 
-  get pageCapacity(): number {
+  get pageSize(): number {
     return this.#pageCapacity;
   }
 
@@ -789,6 +972,103 @@ export class BPlusVectorImpl<T> implements PersistentTreeVector<T> {
     return new BPlusVectorImpl(normalized, this.#pageCapacity, this.#branchFactor);
   }
 
+  slice(start = 0, end = this.length): PersistentTreeVector<T> {
+    const normalizedStart = normalizeSliceIndex(start, this.length);
+    const normalizedEnd = Math.max(normalizedStart, normalizeSliceIndex(end, this.length));
+
+    if (normalizedStart === 0 && normalizedEnd === this.length) {
+      return this;
+    }
+
+    return BPlusVectorImpl.fromIterable(
+      sliceValues(this, normalizedStart, normalizedEnd),
+      { pageSize: this.#pageCapacity, branchFactor: this.#branchFactor },
+      normalizedEnd - normalizedStart,
+    );
+  }
+
+  splice(start: number, deleteCount: number, ...items: T[]): PersistentTreeVector<T> {
+    const normalizedStart = normalizeSliceIndex(start, this.length);
+    const normalizedDeleteCount = Number.isNaN(deleteCount)
+      ? 0
+      : Math.min(Math.max(Math.trunc(deleteCount), 0), this.length - normalizedStart);
+    const end = normalizedStart + normalizedDeleteCount;
+
+    if (normalizedDeleteCount === 0 && items.length === 0) {
+      return this;
+    }
+
+    return BPlusVectorImpl.fromIterable(
+      spliceValues(this, normalizedStart, end, items),
+      { pageSize: this.#pageCapacity, branchFactor: this.#branchFactor },
+      this.length - normalizedDeleteCount + items.length,
+    );
+  }
+
+  concat(other: Iterable<T>): PersistentTreeVector<T> {
+    const candidateLength = (other as unknown as { length?: unknown }).length;
+    const otherLength = typeof candidateLength === 'number' ? candidateLength : undefined;
+
+    return BPlusVectorImpl.fromIterable(
+      concatValues(this, other),
+      { pageSize: this.#pageCapacity, branchFactor: this.#branchFactor },
+      otherLength === undefined ? 0 : this.length + otherLength,
+    );
+  }
+
+  convertTo(tree: typeof TREE.B_PLUS, options?: TreeOptions): BPlusVector<T>;
+  convertTo(tree: typeof TREE.RRB, options?: TreeOptions): RRBVector<T>;
+  convertTo(tree: TreeKind, options?: TreeOptions): PersistentTreeVector<T>;
+  convertTo(tree: TreeKind, options: TreeOptions = {}): PersistentTreeVector<T> {
+    if (tree !== TREE.B_PLUS && tree !== TREE.RRB) {
+      throw new TypeError(`Unknown tree implementation: ${String(tree)}.`);
+    }
+
+    if (tree === TREE.B_PLUS) {
+      return this.toBPlus(options);
+    }
+
+    return this.toRRB(options);
+  }
+
+  toBPlus(options: TreeOptions = {}): BPlusVector<T> {
+    const targetCapacity =
+      options.pageSize === undefined && options.profile === undefined
+        ? this.#pageCapacity
+        : resolvePageCapacity(options, this.length);
+    const targetBranchFactor = options.branchFactor ?? this.#branchFactor;
+
+    if (targetCapacity === this.#pageCapacity && targetBranchFactor === this.#branchFactor) {
+      return this;
+    }
+
+    return BPlusVectorImpl.fromIterable(
+      this,
+      { ...options, pageSize: targetCapacity, branchFactor: targetBranchFactor },
+      this.length,
+    );
+  }
+
+  toRRB(options: TreeOptions = {}): RRBVector<T> {
+    return createRrbFromIterable(
+      this,
+      {
+        ...options,
+        pageSize:
+          options.pageSize ??
+          (options.profile ? selectPageCapacity(this.length, options.profile) : this.#pageCapacity),
+        branchFactor: options.branchFactor ?? this.#branchFactor,
+      },
+      this.length,
+    );
+  }
+
+  withProfile(profile: PageProfile): PersistentTreeVector<T> {
+    const tree = profile === PROFILE.BATCH_HEAVY ? TREE.RRB : TREE.B_PLUS;
+
+    return this.convertTo(tree, { profile });
+  }
+
   snapshot(): PersistentTreeVector<T> {
     return this;
   }
@@ -828,6 +1108,14 @@ export class BPlusVectorImpl<T> implements PersistentTreeVector<T> {
       );
     }
   }
+}
+
+export function createBPlusFromIterable<T>(
+  values: Iterable<T>,
+  options: TreeOptions,
+  length: number,
+): BPlusVector<T> {
+  return BPlusVectorImpl.fromIterable(values, options, length);
 }
 
 export class VectorBuilder<T> implements VectorDraft<T> {
@@ -920,22 +1208,49 @@ export class VectorBuilder<T> implements VectorDraft<T> {
   }
 }
 
-export type BPlusVector<T> = PersistentTreeVector<T>;
+export type BPlusVector<T> = PersistentTreeVector<T> & { readonly kind: typeof TREE.B_PLUS };
 
 export const BPlusVector = {
-  from<T>(values: readonly T[], options: TreeOptions = {}): PersistentTreeVector<T> {
+  from<T>(values: readonly T[], options: TreeOptions = {}): BPlusVector<T> {
     return BPlusVectorImpl.from(values, options);
   },
 };
 
-export type RrbVector<T> = PersistentTreeVector<T>;
+export type RrbVector<T> = RRBVector<T>;
+export type RRBVector<T> = PersistentTreeVector<T> & { readonly kind: typeof TREE.RRB };
 
 export { RrbVector };
+export const RRBVector = RrbVector;
 
 export type Vector<T> = PersistentTreeVector<T>;
 
+function automaticTree(profile: PageProfile): TreeKind {
+  return profile === PROFILE.BATCH_HEAVY ? TREE.RRB : TREE.B_PLUS;
+}
+
 export const Vector = {
-  from<T>(values: readonly T[], options: TreeOptions = {}): PersistentTreeVector<T> {
-    return RrbVector.from(values, options);
+  from<T>(values: readonly T[], options: VectorOptions = {}): Vector<T> {
+    assertValidProfile(options.profile);
+
+    if (
+      options.tree !== undefined &&
+      options.tree !== TREE.AUTO &&
+      options.tree !== TREE.B_PLUS &&
+      options.tree !== TREE.RRB
+    ) {
+      throw new TypeError(`Unknown tree selection: ${String(options.tree)}.`);
+    }
+
+    const profile = options.profile ?? PROFILE.BALANCED;
+    const tree =
+      options.tree === undefined || options.tree === TREE.AUTO
+        ? automaticTree(profile)
+        : options.tree;
+
+    if (tree === TREE.B_PLUS) {
+      return BPlusVector.from(values, { ...options, profile });
+    }
+
+    return RrbVector.from(values, { ...options, profile });
   },
 };

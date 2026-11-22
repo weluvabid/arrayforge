@@ -86,8 +86,16 @@ export function runWorkload(
     }
 
     case 'batch-update': {
+      const alternateChanges = changes.map((change) => ({
+        index: change.index,
+        value: options.size + change.value,
+      }));
+
       for (let iteration = 0; iteration < iterations; iteration += 1) {
-        collection = adapter.updateMany(collection, changes);
+        collection = adapter.updateMany(
+          collection,
+          iteration % 2 === 0 ? changes : alternateChanges,
+        );
         checksum += adapter.length(collection);
       }
 

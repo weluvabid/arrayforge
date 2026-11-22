@@ -3,7 +3,7 @@ import test from 'node:test';
 import { nativeCopyAdapter, nativeMutableAdapter } from '../src/adapters/native.ts';
 import { benchmark } from '../src/benchmark/measure.ts';
 import { printTable, toCsv } from '../src/benchmark/report.ts';
-import { createRandom } from '../src/benchmark/random.ts';
+import { createChanges, createRandom } from '../src/benchmark/random.ts';
 import { runWorkload, workloadNames } from '../src/benchmark/workloads.ts';
 import type { BenchmarkOptions } from '../src/benchmark/types.ts';
 
@@ -106,4 +106,23 @@ await test('mixed workload produces the same deterministic result across native 
 
   assert.deepEqual(copyResult.collection, mutableResult.collection);
   assert.equal(copyResult.checksum, mutableResult.checksum);
+});
+
+await test('batch updates alternate values so every measured pass changes the collection', () => {
+  const values = Array.from({ length: options.size }, (_, index) => index);
+  const changes = createChanges(options.size, Math.min(1_000, options.size), options.seed);
+  const result = runWorkload(
+    nativeCopyAdapter,
+    'batch-update',
+    nativeCopyAdapter.create(values),
+    options,
+    2,
+  );
+  const finalValues = result.collection as number[];
+
+  const expected = new Map(changes.map((change) => [change.index, change.value]));
+
+  for (const [index, value] of expected) {
+    assert.equal(finalValues[index], options.size + value);
+  }
 });
