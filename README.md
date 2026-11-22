@@ -7,13 +7,13 @@ ArrayForge keeps earlier versions of a collection available while you create upd
 ## Install
 
 ```sh
-pnpm add arrayforge
+pnpm add @arrayforge/core
 ```
 
 ## Quick start
 
 ```ts
-import { Vector } from 'arrayforge';
+import { Vector } from '@arrayforge/core';
 
 const users = Vector.from([
   { id: 1, name: 'Ada' },
@@ -33,7 +33,7 @@ console.log(nextUsers.get(1)?.name); // Grace Hopper
 `Vector.from()` uses the RRB engine by default. The mutation-heavy profile selects B+; the other profiles select RRB.
 
 ```ts
-import { PROFILE, Vector } from 'arrayforge';
+import { PROFILE, Vector } from '@arrayforge/core';
 
 const general = Vector.from(data);
 const batchWork = Vector.from(data, { profile: PROFILE.BATCH_HEAVY });
@@ -44,7 +44,7 @@ const mutationWork = Vector.from(data, { profile: PROFILE.MUTATION_HEAVY });
 You can also choose an implementation directly:
 
 ```ts
-import { BPlusVector, RRBVector } from 'arrayforge';
+import { BPlusVector, RRBVector } from '@arrayforge/core';
 
 const indexedEdits = BPlusVector.from(data);
 const sequenceWork = RRBVector.from(data);
@@ -57,7 +57,7 @@ Both engines expose the same collection operations. RRB is the default; B+ remai
 A collection can be rebuilt into the other tree without first converting the whole collection into a JavaScript array.
 
 ```ts
-import { TREE } from 'arrayforge';
+import { TREE } from '@arrayforge/core';
 
 const rrb = general.convertTo(TREE.RRB);
 const bplus = rrb.toBPlus();
@@ -92,7 +92,7 @@ Transactions are synchronous. If the callback throws, the original collection re
 Use the exported constants for the built-in page sizes:
 
 ```ts
-import { PAGE_SIZE, TREE, Vector } from 'arrayforge';
+import { PAGE_SIZE, TREE, Vector } from '@arrayforge/core';
 
 const compact = Vector.from(data, {
   tree: TREE.B_PLUS,

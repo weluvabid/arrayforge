@@ -1,5 +1,5 @@
 {
-  "name": "arrayforge",
+  "name": "@arrayforge/core",
   "version": "0.1.0",
   "description": "Persistent vectors for large JavaScript and TypeScript datasets.",
   "license": "MIT",

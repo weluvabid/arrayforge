@@ -38,7 +38,7 @@ Custom page sizes are supported. A page size and branch factor must each be safe
 Creates a vector using automatic tree selection. The default profile is `PROFILE.BALANCED`.
 
 ```ts
-import { PROFILE, TREE, Vector } from 'arrayforge';
+import { PROFILE, TREE, Vector } from '@arrayforge/core';
 
 const general = Vector.from(values);
 const batch = Vector.from(values, { profile: PROFILE.BATCH_HEAVY });
@@ -111,7 +111,7 @@ All operations return a new collection when they change its contents. The source
 Use `convertTo()` when the destination is selected at runtime, or use the dedicated methods when it is known in advance.
 
 ```ts
-import { TREE } from 'arrayforge';
+import { TREE } from '@arrayforge/core';
 
 const rrb = vector.convertTo(TREE.RRB);
 const bplus = rrb.toBPlus();
@@ -126,7 +126,7 @@ Conversion options accept `pageSize`, `profile`, and `branchFactor`. TypeScript 
 `withProfile(profile)` returns a collection configured for the requested workload, rebuilding it when the selected tree or page size changes:
 
 ```ts
-import { PROFILE } from 'arrayforge';
+import { PROFILE } from '@arrayforge/core';
 
 const batchOptimized = vector.withProfile(PROFILE.BATCH_HEAVY);
 const readOptimized = batchOptimized.withProfile(PROFILE.READ_HEAVY);
