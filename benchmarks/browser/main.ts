@@ -106,6 +106,7 @@ function runAdapter(
       : heapDeltas.reduce((total, value) => total + value, 0) / heapDeltas.length;
 
   return {
+    status: 'completed',
     adapter: adapter.name,
     workload,
     size: options.size,

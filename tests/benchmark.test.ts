@@ -92,6 +92,7 @@ await test('construction workload measures adapter creation', () => {
   const result = benchmark(adapter, 'construction', options, 1);
 
   assert.ok(creations >= options.warmup + options.rounds);
+  assert.equal(result.status, 'completed');
   assert.equal(result.workload, 'construction');
   assert.equal(result.iterations, 1);
   assert.equal(result.checksum, options.size * options.rounds);
@@ -141,6 +142,7 @@ await test('benchmark reports include calibration and memory collection metadata
   const table = printTable([result]);
   const csv = toCsv([result]);
 
+  assert.match(table, /completed/);
   assert.match(table, /iterations/);
   assert.match(table, /explicit gc/);
   assert.match(csv, /target_sample_ms/);
@@ -261,4 +263,21 @@ await test('calibration excludes initial collection construction for non-constru
   const result = benchmark(adapter, 'point-read', { ...options, targetSampleMs: 5 });
 
   assert.ok(result.iterations > 1_000);
+});
+
+await test('timeout results are explicit and contain no fabricated performance metrics', async () => {
+  const { printTable, toCsv } = await import('../src/benchmark/report.ts');
+  const timeout = {
+    status: 'timeout' as const,
+    adapter: 'immer',
+    workload: 'mixed-operations' as const,
+    size: 100_000,
+    timeoutMs: 2_000,
+  };
+
+  assert.match(printTable([timeout]), /TIMEOUT/);
+  assert.match(printTable([timeout]), /2,000/);
+  const csv = toCsv([timeout]);
+  assert.match(csv, /timeout,immer,mixed-operations,100000,2000/);
+  assert.equal(csv.split('\n')[1]?.split(',').length, csv.split('\n')[0]?.split(',').length);
 });

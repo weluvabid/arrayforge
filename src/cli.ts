@@ -1,10 +1,11 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { Worker } from 'node:worker_threads';
 import { loadAdapters } from './benchmark/adapters.ts';
-import { benchmark, maximumIterations } from './benchmark/measure.ts';
+import { maximumIterations } from './benchmark/measure.ts';
 import { printTable, toCsv } from './benchmark/report.ts';
 import { workloadNames } from './benchmark/workloads.ts';
-import type { BenchmarkOptions, WorkloadName } from './benchmark/types.ts';
+import type { BenchmarkOptions, BenchmarkRunResult, WorkloadName } from './benchmark/types.ts';
 
 interface CliArguments {
   sizes: number[];
@@ -14,6 +15,7 @@ interface CliArguments {
   warmup: number;
   iterations: number | null;
   targetSampleMs: number;
+  timeoutMs: number;
   seed: number;
   format: 'table' | 'json' | 'csv';
   output: string | null;
@@ -56,6 +58,7 @@ function parseArguments(args: readonly string[]): CliArguments {
     warmup: 3,
     iterations: null,
     targetSampleMs: 25,
+    timeoutMs: 2_000,
     seed: 42,
     format: 'table',
     output: null,
@@ -99,6 +102,10 @@ function parseArguments(args: readonly string[]): CliArguments {
         break;
       case '--target-ms':
         parsed.targetSampleMs = parseNumber(readValue(args, index, argument), argument, 1);
+        index += 1;
+        break;
+      case '--timeout-ms':
+        parsed.timeoutMs = parseNumber(readValue(args, index, argument), argument, 1);
         index += 1;
         break;
       case '--seed':
@@ -160,10 +167,80 @@ function printHelp(): void {
     '  --iterations N           fixed operations per round (disables calibration)\n',
   );
   process.stdout.write('  --target-ms 25            target duration per measured round\n');
+  process.stdout.write('  --timeout-ms 2000         hard per-adapter/workload timeout\n');
   process.stdout.write('  --seed 42                deterministic workload seed\n');
   process.stdout.write('  --format table            table, json or csv\n');
   process.stdout.write('  --output report.json      write results to a file\n');
   process.stdout.write('  --list                    list installed adapters and workloads\n');
+}
+
+interface WorkerMessage {
+  readonly result?: BenchmarkRunResult;
+  readonly error?: string;
+}
+
+function runIsolatedBenchmark(
+  adapter: string,
+  workload: WorkloadName,
+  options: BenchmarkOptions,
+  iterations: number | null,
+  timeoutMs: number,
+): Promise<BenchmarkRunResult> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./benchmark/worker.ts', import.meta.url), {
+      workerData: { adapter, workload, options, iterations },
+      execArgv: process.execArgv,
+    });
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      worker
+        .terminate()
+        .then(
+          () => resolve({ status: 'timeout', adapter, workload, size: options.size, timeoutMs }),
+          reject,
+        );
+    }, timeoutMs);
+
+    worker.once('message', (message: WorkerMessage) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timeout);
+
+      if (message.error) {
+        reject(new Error(message.error));
+      } else if (message.result) {
+        resolve(message.result);
+      } else {
+        reject(new Error(`Benchmark worker returned no result for ${adapter}/${workload}.`));
+      }
+    });
+    worker.once('error', (error) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timeout);
+      reject(error);
+    });
+    worker.once('exit', (code) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timeout);
+      reject(new Error(`Benchmark worker exited with code ${code} for ${adapter}/${workload}.`));
+    });
+  });
 }
 
 async function main(): Promise<void> {
@@ -196,7 +273,7 @@ async function main(): Promise<void> {
     }
   }
 
-  const results = [];
+  const results: BenchmarkRunResult[] = [];
 
   for (const size of args.sizes) {
     const options: BenchmarkOptions = {
@@ -219,7 +296,21 @@ async function main(): Promise<void> {
               iterations === null ? `calibrated to ${args.targetSampleMs}ms` : `${iterations} ops`
             })\n`,
         );
-        results.push(benchmark(adapter, workload, options, iterations ?? undefined));
+        const result = await runIsolatedBenchmark(
+          adapter.name,
+          workload,
+          options,
+          iterations,
+          args.timeoutMs,
+        );
+        results.push(result);
+
+        if (result.status === 'timeout') {
+          process.stderr.write(
+            `Timed out ${adapter.name} / ${workload} / ${size.toLocaleString('en-US')} ` +
+              `after ${args.timeoutMs}ms; result excluded from performance comparisons\n`,
+          );
+        }
       }
     }
   }

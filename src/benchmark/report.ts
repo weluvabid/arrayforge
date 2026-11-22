@@ -1,20 +1,19 @@
-import type { BenchmarkResult } from './types.ts';
+import type { BenchmarkRunResult } from './types.ts';
 
 function escapeCsv(value: string | number | boolean | null): string {
   const text = value === null ? '' : String(value);
-
-  if (text.includes(',') || text.includes('"') || text.includes('\n')) {
-    return `"${text.replaceAll('"', '""')}"`;
-  }
-
-  return text;
+  return text.includes(',') || text.includes('"') || text.includes('\n')
+    ? `"${text.replaceAll('"', '""')}"`
+    : text;
 }
 
-export function toCsv(results: readonly BenchmarkResult[]): string {
+export function toCsv(results: readonly BenchmarkRunResult[]): string {
   const columns = [
+    'status',
     'adapter',
     'workload',
     'size',
+    'timeout_ms',
     'rounds',
     'iterations',
     'target_sample_ms',
@@ -40,11 +39,24 @@ export function toCsv(results: readonly BenchmarkResult[]): string {
     'mean_branch_occupancy',
     'max_branch_occupancy',
   ];
-  const rows = results.map((result) =>
-    [
+  const rows = results.map((result) => {
+    if (result.status === 'timeout') {
+      return [
+        result.status,
+        result.adapter,
+        result.workload,
+        result.size,
+        result.timeoutMs,
+        ...Array.from({ length: columns.length - 5 }, () => null),
+      ];
+    }
+
+    return [
+      result.status,
       result.adapter,
       result.workload,
       result.size,
+      null,
       result.rounds,
       result.iterations,
       result.targetSampleMs,
@@ -69,46 +81,67 @@ export function toCsv(results: readonly BenchmarkResult[]): string {
       result.structure?.minBranchOccupancy ?? null,
       result.structure?.meanBranchOccupancy ?? null,
       result.structure?.maxBranchOccupancy ?? null,
-    ]
-      .map(escapeCsv)
-      .join(','),
-  );
-
-  return [columns.join(','), ...rows].join('\n');
+    ];
+  });
+  return [columns.join(','), ...rows.map((row) => row.map(escapeCsv).join(','))].join('\n');
 }
 
-export function printTable(results: readonly BenchmarkResult[]): string {
-  const rows = results.map((result) => ({
-    adapter: result.adapter,
-    workload: result.workload,
-    size: result.size.toLocaleString('en-US'),
-    iterations: result.iterations.toLocaleString('en-US'),
-    'sample ms': result.sampleDurationMs.toFixed(1),
-    'explicit gc': result.explicitGc ? 'yes' : 'no',
-    'p50 ms': result.latencyMs.p50.toFixed(4),
-    'p95 ms': result.latencyMs.p95.toFixed(4),
-    'p99 ms': result.latencyMs.p99.toFixed(4),
-    'ops/sec': Math.round(result.operationsPerSecond).toLocaleString('en-US'),
-    'heap Δ MB':
-      result.memoryDeltaBytes.heapUsed === null
-        ? 'n/a'
-        : (result.memoryDeltaBytes.heapUsed / 1_048_576).toFixed(2),
-    'buffers Δ MB':
-      result.memoryDeltaBytes.arrayBuffers === null
-        ? 'n/a'
-        : (result.memoryDeltaBytes.arrayBuffers / 1_048_576).toFixed(2),
-    nodes: result.structure?.nodes.toLocaleString('en-US') ?? 'n/a',
-    'leaf min/avg/max': result.structure
-      ? `${result.structure.minLeafOccupancy}/${result.structure.meanLeafOccupancy.toFixed(1)}/${result.structure.maxLeafOccupancy}`
-      : 'n/a',
-    'branch min/avg/max': result.structure
-      ? `${result.structure.minBranchOccupancy}/${result.structure.meanBranchOccupancy.toFixed(1)}/${result.structure.maxBranchOccupancy}`
-      : 'n/a',
-  }));
-
-  if (rows.length === 0) {
+export function printTable(results: readonly BenchmarkRunResult[]): string {
+  if (results.length === 0) {
     return 'No benchmark results.';
   }
+
+  const rows = results.map((result) =>
+    result.status === 'timeout'
+      ? {
+          status: 'TIMEOUT',
+          adapter: result.adapter,
+          workload: result.workload,
+          size: result.size.toLocaleString('en-US'),
+          iterations: '—',
+          'sample ms': '—',
+          'timeout ms': result.timeoutMs.toLocaleString('en-US'),
+          'explicit gc': '—',
+          'p50 ms': '—',
+          'p95 ms': '—',
+          'p99 ms': '—',
+          'ops/sec': '—',
+          'heap Δ MB': '—',
+          'buffers Δ MB': '—',
+          nodes: '—',
+          'leaf min/avg/max': '—',
+          'branch min/avg/max': '—',
+        }
+      : {
+          status: 'completed',
+          adapter: result.adapter,
+          workload: result.workload,
+          size: result.size.toLocaleString('en-US'),
+          iterations: result.iterations.toLocaleString('en-US'),
+          'sample ms': result.sampleDurationMs.toFixed(1),
+          'timeout ms': '—',
+          'explicit gc': result.explicitGc ? 'yes' : 'no',
+          'p50 ms': result.latencyMs.p50.toFixed(4),
+          'p95 ms': result.latencyMs.p95.toFixed(4),
+          'p99 ms': result.latencyMs.p99.toFixed(4),
+          'ops/sec': Math.round(result.operationsPerSecond).toLocaleString('en-US'),
+          'heap Δ MB':
+            result.memoryDeltaBytes.heapUsed === null
+              ? 'n/a'
+              : (result.memoryDeltaBytes.heapUsed / 1_048_576).toFixed(2),
+          'buffers Δ MB':
+            result.memoryDeltaBytes.arrayBuffers === null
+              ? 'n/a'
+              : (result.memoryDeltaBytes.arrayBuffers / 1_048_576).toFixed(2),
+          nodes: result.structure?.nodes.toLocaleString('en-US') ?? 'n/a',
+          'leaf min/avg/max': result.structure
+            ? `${result.structure.minLeafOccupancy}/${result.structure.meanLeafOccupancy.toFixed(1)}/${result.structure.maxLeafOccupancy}`
+            : 'n/a',
+          'branch min/avg/max': result.structure
+            ? `${result.structure.minBranchOccupancy}/${result.structure.meanBranchOccupancy.toFixed(1)}/${result.structure.maxBranchOccupancy}`
+            : 'n/a',
+        },
+  );
 
   const headers = Object.keys(rows[0] ?? {});
   const widths = headers.map((header) =>

@@ -56,6 +56,7 @@ export interface BenchmarkOptions {
 }
 
 export interface BenchmarkResult {
+  readonly status: 'completed';
   readonly adapter: string;
   readonly workload: WorkloadName;
   readonly size: number;
@@ -84,3 +85,13 @@ export interface AdapterLoadResult {
   readonly adapter: CollectionAdapter | null;
   readonly reason?: string;
 }
+
+export interface BenchmarkTimeoutResult {
+  readonly status: 'timeout';
+  readonly adapter: string;
+  readonly workload: WorkloadName;
+  readonly size: number;
+  readonly timeoutMs: number;
+}
+
+export type BenchmarkRunResult = BenchmarkResult | BenchmarkTimeoutResult;

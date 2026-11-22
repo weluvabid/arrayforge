@@ -87,3 +87,9 @@ Use the same Node version, hardware, dataset size, seed, warm-up count, measured
 ## RRB structural operations
 
 Run `pnpm bench:structural` to measure subtree-sharing `slice`, `concat` and `splice` operations. The script accepts `--size`, `--warmup`, `--rounds`, `--page-size` and `--fanout`; it validates each result outside the timed interval.
+
+### Per-workload timeout
+
+Each adapter/workload/dataset-size run executes in its own worker thread. The CLI terminates that worker after 2,000 ms by default, so a synchronous workload cannot hold the benchmark suite indefinitely. Override the limit with `--timeout-ms N`.
+
+A timed-out run is emitted with `status: "timeout"` and its timeout limit. It has no latency, throughput, checksum, or memory measurements and must be excluded from performance comparisons. The timeout is a completion classification, not a measured duration or a zero-throughput sample.

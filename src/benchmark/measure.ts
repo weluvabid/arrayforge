@@ -255,6 +255,7 @@ export function benchmark(
   const checksum = samples.reduce((total, sample) => total + sample.checksum, 0);
 
   return {
+    status: 'completed',
     adapter: adapter.name,
     workload,
     size: options.size,
